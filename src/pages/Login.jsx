@@ -1,19 +1,38 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Building2, Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
+import { Building2, Mail, Lock, LogIn, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, loading, error } = useAuthStore();
+  const [successMessage, setSuccessMessage] = useState('');
+  const [localError, setLocalError] = useState('');
+  const { login, resetPassword, loading, error } = useAuthStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSuccessMessage('');
+    setLocalError('');
     try {
       await login(email, password);
       navigate('/');
+    } catch (err) {
+      // Error is handled in the store
+    }
+  };
+
+  const handleResetPassword = async () => {
+    setSuccessMessage('');
+    setLocalError('');
+    if (!email) {
+      setLocalError("Please enter your email address first to reset password.");
+      return;
+    }
+    try {
+      await resetPassword(email);
+      setSuccessMessage("Password reset email sent. Please check your inbox and spam folder.");
     } catch (err) {
       // Error is handled in the store
     }
@@ -38,14 +57,27 @@ const Login = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-200">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {error && (
+            {(error || localError) && (
               <div className="bg-red-50 border-l-4 border-red-400 p-4">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm text-red-700">{error}</p>
+                    <p className="text-sm text-red-700">{error || localError}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="bg-green-50 border-l-4 border-green-400 p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <CheckCircle2 className="h-5 w-5 text-green-400" aria-hidden="true" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-green-700">{successMessage}</p>
                   </div>
                 </div>
               </div>
@@ -92,6 +124,19 @@ const Login = () => {
                   className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
                   placeholder="••••••••"
                 />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end">
+              <div className="text-sm">
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={loading}
+                  className="font-medium text-blue-600 hover:text-blue-500 disabled:opacity-50"
+                >
+                  Forgot your password?
+                </button>
               </div>
             </div>
 
