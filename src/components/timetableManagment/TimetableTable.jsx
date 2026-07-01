@@ -136,14 +136,14 @@ const TimetableTable = ({
       >
       <table className="w-full">
         <thead className="sticky top-0 z-20">
-          <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="sticky left-0 z-30 p-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wide w-24 bg-gray-50 border-r border-gray-200">
+          <tr className="bg-gray-50 border-b border-gray-400">
+            <th className="sticky left-0 z-30 p-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wide w-24 bg-gray-50 border-r border-gray-400">
               Time
             </th>
             {days.map((day) => (
               <th 
                 key={day} 
-                className="p-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wide min-w-[120px] bg-gray-50"
+                className="p-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wide min-w-[120px] bg-gray-50 border-b border-gray-400"
               >
                 {day}
               </th>
@@ -152,8 +152,8 @@ const TimetableTable = ({
         </thead>
         <tbody>
           {timeSlots.map((slot, rowIndex) => (
-            <tr key={rowIndex} className="border-b border-gray-200">
-              <td className="sticky left-0 z-10 p-3 font-medium text-gray-600 bg-gray-50 text-xs whitespace-nowrap border-r border-gray-200">
+            <tr key={rowIndex} className="border-b border-gray-400">
+              <td className="sticky left-0 z-10 p-3 font-medium text-gray-600 bg-gray-50 text-xs whitespace-nowrap border-r border-gray-400">
                 {slot}
               </td>
               {days.map((_, colIndex) => {

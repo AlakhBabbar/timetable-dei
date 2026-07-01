@@ -22,6 +22,15 @@ import { normalize, safeId } from "../../utils/dataHelpers";
 
 const schedulesCol = collection(db, "schedules");
 
+let cachedSchedules = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 15000; // 15 seconds cache
+
+export function clearSchedulesCache() {
+  cachedSchedules = null;
+  lastFetchTime = 0;
+}
+
 /**
  * Fetches all schedules for a timetable
  */
@@ -37,6 +46,7 @@ export async function getSchedulesByTimetableId(timetableId) {
  * Deletes all schedules for a timetable
  */
 export async function deleteSchedulesByTimetableId(timetableId) {
+  clearSchedulesCache();
   if (!timetableId) return;
 
   const snap = await getDocs(
@@ -59,6 +69,7 @@ export async function deleteSchedulesByTimetableId(timetableId) {
  * - Handles migration from single to multiple batches
  */
 export async function saveSchedules({ timetableId, schedules }) {
+  clearSchedulesCache();
   const list = Array.isArray(schedules) ? schedules : [];
   console.log('💾 saveSchedules called with:', { timetableId, schedulesCount: list.length });
   if (!timetableId) throw new Error("timetableId is required");
@@ -160,13 +171,21 @@ export async function saveSchedules({ timetableId, schedules }) {
  * Deletes a single schedule by ID
  */
 export async function deleteScheduleById(scheduleId) {
+  clearSchedulesCache();
   await deleteDoc(doc(schedulesCol, String(scheduleId)));
 }
 
 /**
  * Fetches all schedules across all timetables
  */
-export async function getAllSchedules() {
+export async function getAllSchedules(forceRefresh = false) {
+  const now = Date.now();
+  if (cachedSchedules && !forceRefresh && (now - lastFetchTime < CACHE_DURATION)) {
+    console.log("⚡ [getAllSchedules] Returning cached schedules, saved reads!");
+    return cachedSchedules;
+  }
   const snap = await getDocs(schedulesCol);
-  return snap.docs.map((d) => d.data());
+  cachedSchedules = snap.docs.map((d) => d.data());
+  lastFetchTime = now;
+  return cachedSchedules;
 }

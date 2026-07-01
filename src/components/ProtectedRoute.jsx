@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { Loader2 } from 'lucide-react';
 
 const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuthStore();
+  const { user, role, loading } = useAuthStore();
   const location = useLocation();
 
   if (loading) {
@@ -24,6 +24,11 @@ const ProtectedRoute = ({ children }) => {
     // along to that page after they login, which is a nicer user experience
     // than dropping them off on the home page.
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Restrict teachers to only the Teacher Occupancy page
+  if (role === "teacher" && location.pathname !== "/teacher-occupancy") {
+    return <Navigate to="/teacher-occupancy" replace />;
   }
 
   return children;

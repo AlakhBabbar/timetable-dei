@@ -18,13 +18,39 @@ const normalize = (value) =>
     .trim()
     .replace(/\s+/g, " ");
 
-export async function listRooms({ faculty } = {}) {
-  const q = faculty ? query(roomsCol, where("faculty", "==", faculty)) : roomsCol;
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ ...d.data(), unid: Number(d.id) || d.data().unid }));
+let cachedRooms = null;
+let lastRoomsFetch = 0;
+const CACHE_DURATION = 15000; // 15 seconds
+
+export function clearRoomsCache() {
+  cachedRooms = null;
+  lastRoomsFetch = 0;
+}
+
+export async function listRooms({ faculty } = {}, forceRefresh = false) {
+  const now = Date.now();
+  if (cachedRooms && !forceRefresh && (now - lastRoomsFetch < CACHE_DURATION)) {
+    console.log("⚡ [listRooms] Returning cached rooms, saved reads!");
+    if (faculty) {
+      const normalizedFaculty = normalize(faculty).toLowerCase();
+      return cachedRooms.filter(r => normalize(r.faculty).toLowerCase() === normalizedFaculty);
+    }
+    return cachedRooms;
+  }
+  
+  const snap = await getDocs(roomsCol);
+  cachedRooms = snap.docs.map((d) => ({ ...d.data(), unid: Number(d.id) || d.data().unid }));
+  lastRoomsFetch = now;
+  
+  if (faculty) {
+    const normalizedFaculty = normalize(faculty).toLowerCase();
+    return cachedRooms.filter(r => normalize(r.faculty).toLowerCase() === normalizedFaculty);
+  }
+  return cachedRooms;
 }
 
 export async function upsertRoom(room) {
+  clearRoomsCache();
   const unid = room.unid ?? Date.now();
   const payload = {
     unid,
@@ -51,15 +77,16 @@ export async function upsertRoom(room) {
 }
 
 export async function deleteRoom(unid) {
+  clearRoomsCache();
   await deleteDoc(doc(roomsCol, String(unid)));
   await logAction("delete_room", `Room ID ${unid} deleted`);
 }
 
-export async function listFaculties() {
-  const snap = await getDocs(roomsCol);
+export async function listFaculties(forceRefresh = false) {
+  const rooms = await listRooms({}, forceRefresh);
   const set = new Set();
-  snap.docs.forEach((d) => {
-    const faculty = normalize(d.data().faculty);
+  rooms.forEach((r) => {
+    const faculty = normalize(r.faculty);
     if (faculty) set.add(faculty);
   });
   return Array.from(set).sort((a, b) => a.localeCompare(b));

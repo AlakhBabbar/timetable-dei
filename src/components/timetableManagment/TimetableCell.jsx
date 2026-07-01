@@ -1004,7 +1004,7 @@ const TimetableCell = ({
   return (
     <td 
       rowSpan={rowSpan || 1}
-      className={`p-2 min-w-[140px] align-top relative group cursor-move transition-all border-r border-gray-200 ${
+      className={`p-2 min-w-[140px] align-top relative group cursor-move transition-all border-r border-gray-400 ${
         dragOver
           ? 'bg-indigo-50 ring-2 ring-indigo-400 shadow-inner'
           : isFilled

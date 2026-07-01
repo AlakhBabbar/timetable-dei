@@ -261,10 +261,10 @@ const ClassOccupancy = () => {
     }
   };
 
-  const handleExportPdfMobile = (branchColors = {}, orderedClasses = null) => {
+  const handleExportPdfMobile = (branchColors = {}, orderedClasses = null, layout = "multi") => {
     const classesToExport = orderedClasses || (selectedClass ? [selectedClass] : []);
     if (classesToExport.length > 0) {
-      exportClassOccupancyToPdfMobile(classesToExport, schedules, timeSlots, "class-occupancy-mobile", branchColors);
+      exportClassOccupancyToPdfMobile(classesToExport, schedules, timeSlots, "class-occupancy-mobile", branchColors, layout);
     }
   };
   
@@ -285,9 +285,9 @@ const ClassOccupancy = () => {
     exportClassOccupancyToExcel(classesToExport, schedules, timeSlots, "all-classes-occupancy", branchColors);
   };
 
-  const handleExportAllPdfMobile = (branchColors = {}, orderedClasses = null) => {
+  const handleExportAllPdfMobile = (branchColors = {}, orderedClasses = null, layout = "multi") => {
     const classesToExport = orderedClasses || filteredClasses;
-    exportClassOccupancyToPdfMobile(classesToExport, schedules, timeSlots, "all-classes-occupancy-mobile", branchColors);
+    exportClassOccupancyToPdfMobile(classesToExport, schedules, timeSlots, "all-classes-occupancy-mobile", branchColors, layout);
   };
   
   const handleExportAllExcelMobile = (branchColors = {}, orderedClasses = null) => {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { BookOpen, Search, Users, Save, Filter, ClipboardList, CheckCircle2, XCircle } from "lucide-react";
+import { BookOpen, Search, Users, Save, Filter, ClipboardList, CheckCircle2, XCircle, Download, ChevronDown } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { courseService, teacherService } from "../firebase/services";
+import { exportCourseListToPdf, exportCourseListToExcel } from "../utils/courseExport";
 
 const ManageAllCourses = () => {
   const [courses, setCourses] = useState([]);
@@ -15,6 +16,7 @@ const ManageAllCourses = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(null);
   const [teacherSearchQuery, setTeacherSearchQuery] = useState("");
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -121,6 +123,16 @@ const ManageAllCourses = () => {
     }
   };
 
+  const handleExportPdf = () => {
+    exportCourseListToPdf(courses, teachers, "dei-course-list");
+    setShowExportMenu(false);
+  };
+
+  const handleExportExcel = () => {
+    exportCourseListToExcel(courses, teachers, "dei-course-list");
+    setShowExportMenu(false);
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <Header />
@@ -197,6 +209,44 @@ const ManageAllCourses = () => {
                 <Save className="w-4 h-4" />
                 {saving ? "Saving..." : `Update All (${courses.filter(c => c.isModified).length})`}
               </button>
+
+              {courses.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                  
+                  {showExportMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowExportMenu(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                        <button
+                          onClick={handleExportPdf}
+                          className="w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 text-left"
+                        >
+                          <Download className="w-4 h-4" />
+                          Export as PDF
+                        </button>
+                        <button
+                          onClick={handleExportExcel}
+                          className="w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 text-left border-t border-gray-100"
+                        >
+                          <Download className="w-4 h-4" />
+                          Export as Excel
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

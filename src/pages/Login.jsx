@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Building2, Mail, Lock, LogIn, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Building2, Mail, Lock, LogIn, AlertCircle, CheckCircle2, UserPlus } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [localError, setLocalError] = useState('');
-  const { login, resetPassword, loading, error } = useAuthStore();
+  const { login, signUpTeacher, resetPassword, loading, error } = useAuthStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -16,8 +17,16 @@ const Login = () => {
     setSuccessMessage('');
     setLocalError('');
     try {
-      await login(email, password);
-      navigate('/');
+      if (isSignUp) {
+        await signUpTeacher(email, password);
+        setSuccessMessage("Teacher account created successfully! Redirecting...");
+        setTimeout(() => {
+          navigate('/teacher-occupancy');
+        }, 1500);
+      } else {
+        await login(email, password);
+        navigate('/');
+      }
     } catch (err) {
       // Error is handled in the store
     }
@@ -50,12 +59,46 @@ const Login = () => {
           Dayalbagh Educational Institute
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Sign in to access the Timetable Management System
+          Timetable Management System
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-200">
+          {/* Tab switcher */}
+          <div className="flex border-b border-gray-200 mb-6">
+            <button
+              type="button"
+              className={`flex-1 text-center pb-3 text-sm font-semibold border-b-2 transition-colors duration-200 ${
+                !isSignUp
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+              onClick={() => {
+                setIsSignUp(false);
+                setSuccessMessage('');
+                setLocalError('');
+              }}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className={`flex-1 text-center pb-3 text-sm font-semibold border-b-2 transition-colors duration-200 ${
+                isSignUp
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+              onClick={() => {
+                setIsSignUp(true);
+                setSuccessMessage('');
+                setLocalError('');
+              }}
+            >
+              Teacher Sign Up
+            </button>
+          </div>
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             {(error || localError) && (
               <div className="bg-red-50 border-l-4 border-red-400 p-4">
@@ -100,7 +143,7 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
-                  placeholder="admin@dei.ac.in"
+                  placeholder={isSignUp ? "teacher@dei.ac.in" : "admin@dei.ac.in"}
                 />
               </div>
             </div>
@@ -117,7 +160,7 @@ const Login = () => {
                   id="password"
                   name="password"
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete={isSignUp ? "new-password" : "current-password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -127,18 +170,20 @@ const Login = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-end">
-              <div className="text-sm">
-                <button
-                  type="button"
-                  onClick={handleResetPassword}
-                  disabled={loading}
-                  className="font-medium text-blue-600 hover:text-blue-500 disabled:opacity-50"
-                >
-                  Forgot your password?
-                </button>
+            {!isSignUp && (
+              <div className="flex items-center justify-end">
+                <div className="text-sm">
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    disabled={loading}
+                    className="font-medium text-blue-600 hover:text-blue-500 disabled:opacity-50"
+                  >
+                    Forgot your password?
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <button
@@ -152,16 +197,41 @@ const Login = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Signing in...
+                    {isSignUp ? "Signing up..." : "Signing in..."}
                   </span>
                 ) : (
                   <span className="flex items-center">
-                    <LogIn className="w-5 h-5 mr-2" />
-                    Sign In
+                    {isSignUp ? (
+                      <>
+                        <UserPlus className="w-5 h-5 mr-2" />
+                        Sign Up as Teacher
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="w-5 h-5 mr-2" />
+                        Sign In
+                      </>
+                    )}
                   </span>
                 )}
               </button>
             </div>
+
+            {isSignUp && (
+              <div className="text-center mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(false);
+                    setSuccessMessage('');
+                    setLocalError('');
+                  }}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                >
+                  Already have an account? Sign In
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </div>

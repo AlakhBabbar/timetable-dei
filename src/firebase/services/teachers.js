@@ -18,17 +18,49 @@ const normalize = (value) =>
     .trim()
     .replace(/\s+/g, " ");
 
-export async function listTeachers({ faculty, department } = {}) {
-  const constraints = [];
-  if (faculty) constraints.push(where("faculty", "==", faculty));
-  if (department) constraints.push(where("department", "==", department));
+let cachedTeachers = null;
+let lastTeachersFetch = 0;
+const CACHE_DURATION = 15000; // 15 seconds
 
-  const q = constraints.length ? query(teachersCol, ...constraints) : teachersCol;
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ ...d.data(), unid: Number(d.id) || d.data().unid }));
+export function clearTeachersCache() {
+  cachedTeachers = null;
+  lastTeachersFetch = 0;
+}
+
+export async function listTeachers({ faculty, department } = {}, forceRefresh = false) {
+  const now = Date.now();
+  if (cachedTeachers && !forceRefresh && (now - lastTeachersFetch < CACHE_DURATION)) {
+    console.log("⚡ [listTeachers] Returning cached teachers, saved reads!");
+    let result = cachedTeachers;
+    if (faculty) {
+      const normFaculty = normalize(faculty).toLowerCase();
+      result = result.filter(t => normalize(t.faculty).toLowerCase() === normFaculty);
+    }
+    if (department) {
+      const normDept = normalize(department).toLowerCase();
+      result = result.filter(t => normalize(t.department).toLowerCase() === normDept);
+    }
+    return result;
+  }
+  
+  const snap = await getDocs(teachersCol);
+  cachedTeachers = snap.docs.map((d) => ({ ...d.data(), unid: Number(d.id) || d.data().unid }));
+  lastTeachersFetch = now;
+  
+  let result = cachedTeachers;
+  if (faculty) {
+    const normFaculty = normalize(faculty).toLowerCase();
+    result = result.filter(t => normalize(t.faculty).toLowerCase() === normFaculty);
+  }
+  if (department) {
+    const normDept = normalize(department).toLowerCase();
+    result = result.filter(t => normalize(t.department).toLowerCase() === normDept);
+  }
+  return result;
 }
 
 export async function upsertTeacher(teacher) {
+  clearTeachersCache();
   const unid = teacher.unid ?? Date.now();
   const payload = {
     unid,
@@ -44,26 +76,27 @@ export async function upsertTeacher(teacher) {
 }
 
 export async function deleteTeacher(unid) {
+  clearTeachersCache();
   await deleteDoc(doc(teachersCol, String(unid)));
   await logAction("delete_teacher", `Teacher ID ${unid} deleted`);
 }
 
-export async function listFaculties() {
-  const snap = await getDocs(teachersCol);
+export async function listFaculties(forceRefresh = false) {
+  const teachers = await listTeachers({}, forceRefresh);
   const set = new Set();
-  snap.docs.forEach((d) => {
-    const faculty = normalize(d.data().faculty);
+  teachers.forEach((t) => {
+    const faculty = normalize(t.faculty);
     if (faculty) set.add(faculty);
   });
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
-export async function listDepartments(faculty) {
+export async function listDepartments(faculty, forceRefresh = false) {
   if (!faculty) return [];
-  const snap = await getDocs(query(teachersCol, where("faculty", "==", faculty)));
+  const teachers = await listTeachers({ faculty }, forceRefresh);
   const set = new Set();
-  snap.docs.forEach((d) => {
-    const department = normalize(d.data().department);
+  teachers.forEach((t) => {
+    const department = normalize(t.department);
     if (department) set.add(department);
   });
   return Array.from(set).sort((a, b) => a.localeCompare(b));

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, Plus, Trash2, Save, CheckCircle, Search } from "lucide-react";
+import { Users, Plus, Trash2, Save, CheckCircle, Search, Download } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { teacherService } from "../firebase/services";
+import { exportStaffListToPdf } from "../utils/teacherOccupancyExport";
 
 const TeacherLoad = () => {
   const [faculties, setFaculties] = useState([]);
@@ -278,6 +279,23 @@ const TeacherLoad = () => {
     } catch (error) {
       console.error("Error updating teachers:", error);
       alert("Failed to save teachers. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleExportStaffPdf = async () => {
+    try {
+      setSaving(true);
+      const allTeachers = await teacherService.listTeachers();
+      if (allTeachers && allTeachers.length > 0) {
+        exportStaffListToPdf(allTeachers, "dei-staff-list");
+      } else {
+        alert("No staff found in the database to export!");
+      }
+    } catch (error) {
+      console.error("Error exporting staff list:", error);
+      alert("Failed to export staff list. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -572,6 +590,14 @@ const TeacherLoad = () => {
                 />
               </div>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={handleExportStaffPdf}
+                  disabled={saving}
+                  className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded transition-colors flex items-center gap-2 font-medium"
+                >
+                  <Download className="w-4 h-4" />
+                  {saving ? "Exporting..." : "Export Staff List"}
+                </button>
                 <button
                   onClick={openAddTeacherModal}
                   className="px-4 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors flex items-center gap-2"

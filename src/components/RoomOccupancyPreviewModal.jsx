@@ -17,6 +17,7 @@ const RoomOccupancyPreviewModal = ({
   const [exportSize, setExportSize] = useState("actual"); // "actual" or "mobile"
   const [loading, setLoading] = useState(false);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
+  const [mobilePdfLayout, setMobilePdfLayout] = useState("multi"); // "single" or "multi"
 
   const isMultiRoom = allRooms && allRooms.length > 0;
   const roomsToShow = isMultiRoom ? allRooms : (roomData ? [roomData] : []);
@@ -99,7 +100,7 @@ const RoomOccupancyPreviewModal = ({
       } else {
         // Mobile format
         if (exportFormat === "pdf") {
-          await onExportPdfMobile(roomsToShow, schedules, timeSlots);
+          await onExportPdfMobile(roomsToShow, schedules, timeSlots, mobilePdfLayout);
         } else {
           await onExportExcelMobile(roomsToShow, schedules, timeSlots);
         }
@@ -439,6 +440,36 @@ const RoomOccupancyPreviewModal = ({
                 </label>
               </div>
             </div>
+            {exportSize === "mobile" && exportFormat === "pdf" && (
+              <>
+                <div className="border-l border-gray-300 h-8 mx-2"></div>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-medium text-gray-700">Layout:</label>
+                  <div className="flex gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="single"
+                        checked={mobilePdfLayout === "single"}
+                        onChange={(e) => setMobilePdfLayout(e.target.value)}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">Single Page</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="multi"
+                        checked={mobilePdfLayout === "multi"}
+                        onChange={(e) => setMobilePdfLayout(e.target.value)}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">Multi Page</span>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           
           <div className="flex gap-3">

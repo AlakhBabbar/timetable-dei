@@ -236,10 +236,26 @@ export function exportTimetableToPdf({
   });
 
   const marginX = 24;
-  const marginTop = 32;
 
+  // Branded Centered Header
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(30, 41, 59);
+  doc.text("DAYALBAGH EDUCATIONAL INSTITUTE", 841.89 / 2, 28, { align: "center" });
+  
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139);
+  doc.text("ENGINEERING FACULTY", 841.89 / 2, 42, { align: "center" });
+  
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text(title, marginX, marginTop);
+  doc.setTextColor(30, 41, 59);
+  doc.text(title.toUpperCase(), 841.89 / 2, 60, { align: "center" });
+
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(1);
+  doc.line(marginX, 68, 841.89 - marginX, 68);
 
   const numDays = Math.max(1, grid.head[0].length - 1);
   const timeColW = 75;
@@ -247,7 +263,7 @@ export function exportTimetableToPdf({
   const dayW = availableW / numDays;
 
   const columnStylesConfig = {
-    0: { cellWidth: timeColW, fontStyle: "bold", fillColor: [245, 245, 245], textColor: [0, 0, 0], halign: "left" },
+    0: { cellWidth: timeColW, fontStyle: "bold", fillColor: [248, 250, 252], textColor: [15, 23, 42], halign: "left" },
   };
   for (let c = 1; c <= numDays; c++) {
     columnStylesConfig[c] = { cellWidth: dayW, halign: "left" };
@@ -256,26 +272,27 @@ export function exportTimetableToPdf({
   autoTable(doc, {
     head: grid.head,
     body: grid.body,
-    startY: marginTop + 14,
+    startY: 78,
     theme: "grid",
+    rowPageBreak: 'avoid',
     styles: {
       fontSize: 8,
-      cellPadding: 4,
+      cellPadding: 5,
       overflow: "hidden",
       valign: "top",
-      lineColor: [200, 200, 200],
+      lineColor: [0, 0, 0],
       lineWidth: 0.5,
-      textColor: [0, 0, 0],
+      textColor: [15, 23, 42],
     },
     headStyles: {
       fontStyle: "bold",
       valign: "middle",
-      fillColor: [30, 58, 138],
+      fillColor: [30, 41, 59],
       textColor: [255, 255, 255],
     },
     columnStyles: columnStylesConfig,
     alternateRowStyles: {
-      fillColor: [250, 250, 250],
+      fillColor: [248, 250, 252],
     },
     didParseCell: (data) => {
       if (data.section !== "body") return;
@@ -327,7 +344,7 @@ export function exportTimetableToPdf({
       const segW = cell.width / n;
 
       if (n > 1) {
-        doc.setDrawColor(180);
+        doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.5);
         for (let i = 1; i < n; i += 1) {
           const x = cell.x + segW * i;
@@ -335,7 +352,7 @@ export function exportTimetableToPdf({
         }
       }
 
-      doc.setTextColor(0, 0, 0);
+      doc.setTextColor(15, 23, 42);
       doc.setFontSize(fontSize);
 
       for (let i = 0; i < n; i += 1) {
@@ -355,6 +372,16 @@ export function exportTimetableToPdf({
     },
   });
 
+  // Footer & Watermark
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Page ${i} of ${totalPages}`, marginX, 582);
+  }
+
   const safe = sanitizeFileBaseName(fileName || title);
   doc.save(`${safe}.pdf`);
 }
@@ -372,18 +399,33 @@ export function exportTimetablesToPdf({ fileName, meta, tables }) {
   });
 
   const marginX = 24;
-  const marginTop = 32;
 
   (tables ?? []).forEach((t, index) => {
     if (index > 0) doc.addPage();
 
     const grid = buildTimetableExportGrid(t);
-    // Use table-specific metadata if available, otherwise fall back to global meta
     const tableMeta = t.meta || meta;
     const title = buildPdfTitle(tableMeta, grid.tableId);
 
+    // Branded Centered Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text("DAYALBAGH EDUCATIONAL INSTITUTE", 841.89 / 2, 28, { align: "center" });
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text("ENGINEERING FACULTY", 841.89 / 2, 42, { align: "center" });
+    
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(title, marginX, marginTop);
+    doc.setTextColor(30, 41, 59);
+    doc.text(title.toUpperCase(), 841.89 / 2, 60, { align: "center" });
+
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(1);
+    doc.line(marginX, 68, 841.89 - marginX, 68);
 
     const numDays = Math.max(1, grid.head[0].length - 1);
     const timeColW = 75;
@@ -391,7 +433,7 @@ export function exportTimetablesToPdf({ fileName, meta, tables }) {
     const dayW = availableW / numDays;
 
     const columnStylesConfig = {
-      0: { cellWidth: timeColW, fontStyle: "bold", fillColor: [245, 245, 245], textColor: [0, 0, 0], halign: "left" },
+      0: { cellWidth: timeColW, fontStyle: "bold", fillColor: [248, 250, 252], textColor: [15, 23, 42], halign: "left" },
     };
     for (let c = 1; c <= numDays; c++) {
       columnStylesConfig[c] = { cellWidth: dayW, halign: "left" };
@@ -400,26 +442,27 @@ export function exportTimetablesToPdf({ fileName, meta, tables }) {
     autoTable(doc, {
       head: grid.head,
       body: grid.body,
-      startY: marginTop + 14,
+      startY: 78,
       theme: "grid",
+      rowPageBreak: 'avoid',
       styles: {
         fontSize: 8,
-        cellPadding: 4,
+        cellPadding: 5,
         overflow: "hidden",
         valign: "top",
-        lineColor: [200, 200, 200],
+        lineColor: [0, 0, 0],
         lineWidth: 0.5,
-        textColor: [0, 0, 0],
+        textColor: [15, 23, 42],
       },
       headStyles: {
         fontStyle: "bold",
         valign: "middle",
-        fillColor: [30, 58, 138],
+        fillColor: [30, 41, 59],
         textColor: [255, 255, 255],
       },
       columnStyles: columnStylesConfig,
       alternateRowStyles: {
-        fillColor: [250, 250, 250],
+        fillColor: [248, 250, 252],
       },
       didParseCell: (data) => {
         if (data.section !== "body") return;
@@ -470,7 +513,7 @@ export function exportTimetablesToPdf({ fileName, meta, tables }) {
         const segW = cell.width / n;
 
         if (n > 1) {
-          doc.setDrawColor(180);
+          doc.setDrawColor(0, 0, 0);
           doc.setLineWidth(0.5);
           for (let i = 1; i < n; i += 1) {
             const x = cell.x + segW * i;
@@ -478,7 +521,7 @@ export function exportTimetablesToPdf({ fileName, meta, tables }) {
           }
         }
 
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(15, 23, 42);
         doc.setFontSize(fontSize);
 
         for (let i = 0; i < n; i += 1) {
@@ -498,6 +541,16 @@ export function exportTimetablesToPdf({ fileName, meta, tables }) {
       },
     });
   });
+
+  // Footer & Watermark
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Page ${i} of ${totalPages}`, marginX, 582);
+  }
 
   doc.save(`${safe}.pdf`);
 }

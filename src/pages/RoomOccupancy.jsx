@@ -256,8 +256,8 @@ const RoomOccupancy = () => {
     exportRoomOccupancyToExcel(roomsToExport, schedulesToExport, timeSlotsToExport, "room-occupancy");
   };
   
-  const handleExportPdfMobile = (roomsToExport, schedulesToExport, timeSlotsToExport) => {
-    exportRoomOccupancyToPdfMobile(roomsToExport, schedulesToExport, timeSlotsToExport, "room-occupancy-mobile");
+  const handleExportPdfMobile = (roomsToExport, schedulesToExport, timeSlotsToExport, layout = "multi") => {
+    exportRoomOccupancyToPdfMobile(roomsToExport, schedulesToExport, timeSlotsToExport, "room-occupancy-mobile", layout);
   };
   
   const handleExportExcelMobile = (roomsToExport, schedulesToExport, timeSlotsToExport) => {

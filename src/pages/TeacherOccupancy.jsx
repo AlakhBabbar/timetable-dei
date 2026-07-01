@@ -6,9 +6,19 @@ import { teacherService, timetableService } from "../firebase/services";
 import { getAllSchedules } from "../firebase/services/schedules";
 import { DEFAULT_TIME_SLOTS } from "../utils/timetableUIHelpers";
 import { getCourseDisplayName, getRoomDisplayName } from "../utils/idDisplayHelpers";
-import { exportTeacherOccupancyToPdf, exportTeacherOccupancyToExcel } from "../utils/teacherOccupancyExport";
+import { 
+  exportTeacherOccupancyToPdf, 
+  exportTeacherOccupancyToExcel, 
+  exportStaffListToPdf,
+  exportIndividualTeacherOccupancyToPdf,
+  exportIndividualTeacherOccupancyToExcel
+} from "../utils/teacherOccupancyExport";
+import { db } from "../firebase/firebaseConfig";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { useAuthStore } from "../store/authStore";
 
 const TeacherOccupancy = () => {
+  const { role } = useAuthStore();
   const [teachers, setTeachers] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]);
@@ -25,6 +35,11 @@ const TeacherOccupancy = () => {
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [faculties, setFaculties] = useState([]);
   const [departments, setDepartments] = useState([]);
+
+  // Teacher search states
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchPerformed, setSearchPerformed] = useState(false);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
 
   const days = [
     { key: "Mon", label: "Monday" },
@@ -65,29 +80,139 @@ const TeacherOccupancy = () => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (role) {
+      loadData();
+    }
+  }, [role]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const [teachersData, schedulesData] = await Promise.all([
-        teacherService.listTeachers(),
-        getAllSchedules(),
-      ]);
+      if (role === "teacher") {
+        const teachersData = await teacherService.listTeachers();
+        setTeachers(teachersData);
 
-      console.log('📊 Loaded schedules:', schedulesData.length);
-      console.log('📊 Sample schedule:', schedulesData[0]);
-      console.log('📊 Loaded teachers:', teachersData.length);
-      console.log('📊 Sample teacher:', teachersData[0]);
+        // Extract unique faculties and departments
+        const uniqueFaculties = [...new Set(teachersData.map(t => t.faculty).filter(Boolean))].sort();
+        const uniqueDepartments = [...new Set(teachersData.map(t => t.department).filter(Boolean))].sort();
+        setFaculties(uniqueFaculties);
+        setDepartments(uniqueDepartments);
 
-      // Get unique timetable IDs from schedules
-      const uniqueTimetableIds = [...new Set(schedulesData.map(s => s.timetableId).filter(Boolean))];
-      
-      // Fetch timetable metadata for all unique IDs
+        setViewMode("individual");
+      } else {
+        const [teachersData, schedulesData] = await Promise.all([
+          teacherService.listTeachers(),
+          getAllSchedules(),
+        ]);
+
+        console.log('📊 Loaded schedules:', schedulesData.length);
+        console.log('📊 Sample schedule:', schedulesData[0]);
+        console.log('📊 Loaded teachers:', teachersData.length);
+        console.log('📊 Sample teacher:', teachersData[0]);
+
+        // Get unique timetable IDs from schedules
+        const uniqueTimetableIds = [...new Set(schedulesData.map(s => s.timetableId).filter(Boolean))];
+        
+        // Fetch timetable metadata for all unique IDs
+        const timetablesMap = new Map();
+        await Promise.all(
+          uniqueTimetableIds.map(async (timetableId) => {
+            try {
+              const timetableData = await timetableService.loadTimetable(timetableId);
+              if (timetableData && timetableData.meta) {
+                timetablesMap.set(timetableId, timetableData.meta);
+              }
+            } catch (err) {
+              console.warn(`Failed to load timetable metadata for ${timetableId}:`, err);
+            }
+          })
+        );
+
+        // Resolve IDs to display names and add metadata from timetable
+        const resolvedSchedules = await Promise.all(
+          schedulesData.map(async (schedule) => {
+            const resolved = { ...schedule };
+            
+            // Get metadata from timetable document
+            const timetableMeta = timetablesMap.get(schedule.timetableId);
+            if (timetableMeta) {
+              resolved.class = timetableMeta.class;
+              resolved.branch = timetableMeta.branch;
+              resolved.semester = timetableMeta.semester;
+              resolved.type = timetableMeta.type;
+            }
+            
+            // Resolve courseId to course display name
+            if (schedule.courseId) {
+              resolved.course = await getCourseDisplayName(schedule.courseId);
+            }
+            
+            // Resolve roomId to room display name
+            if (schedule.roomId) {
+              resolved.room = await getRoomDisplayName(schedule.roomId);
+            }
+            
+            return resolved;
+          })
+        );
+
+        setTeachers(teachersData);
+        setSchedules(resolvedSchedules);
+
+        // Extract unique faculties and departments
+        const uniqueFaculties = [...new Set(teachersData.map(t => t.faculty).filter(Boolean))].sort();
+        const uniqueDepartments = [...new Set(teachersData.map(t => t.department).filter(Boolean))].sort();
+        setFaculties(uniqueFaculties);
+        setDepartments(uniqueDepartments);
+
+        // Find the maximum rowIndex to determine the last time slot
+        let maxRowIndex = -1;
+        schedulesData.forEach((schedule) => {
+          if (schedule.rowIndex !== undefined && schedule.rowIndex > maxRowIndex) {
+            maxRowIndex = schedule.rowIndex;
+          }
+        });
+
+        console.log('📊 Maximum rowIndex found:', maxRowIndex);
+
+        // Generate time slots from 0 to maxRowIndex
+        const generatedTimeSlots = [];
+        if (maxRowIndex >= 0) {
+          for (let i = 0; i <= maxRowIndex; i++) {
+            generatedTimeSlots.push(generateTimeSlot(i));
+          }
+        }
+
+        console.log('📊 Generated time slots:', generatedTimeSlots);
+        setTimeSlots(generatedTimeSlots);
+      }
+
+    } catch (err) {
+      console.error("Error loading data:", err);
+      setError("Failed to load teacher occupancy data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectTeacher = async (teacher) => {
+    setSelectedTeacher(teacher);
+    setLoadingSchedule(true);
+    setError(null);
+    setSchedules([]);
+
+    try {
+      // Query schedules for only this teacher
+      const schedulesCol = collection(db, "schedules");
+      const snap = await getDocs(query(schedulesCol, where("teacherId", "==", String(teacher.unid))));
+      const teacherSchedules = snap.docs.map((d) => d.data());
+
+      // Fetch metadata for only the timetables associated with this teacher's schedules
+      const uniqueTimetableIds = [...new Set(teacherSchedules.map((s) => s.timetableId).filter(Boolean))];
       const timetablesMap = new Map();
+
       await Promise.all(
         uniqueTimetableIds.map(async (timetableId) => {
           try {
@@ -101,12 +226,11 @@ const TeacherOccupancy = () => {
         })
       );
 
-      // Resolve IDs to display names and add metadata from timetable
+      // Resolve IDs to displays
       const resolvedSchedules = await Promise.all(
-        schedulesData.map(async (schedule) => {
+        teacherSchedules.map(async (schedule) => {
           const resolved = { ...schedule };
           
-          // Get metadata from timetable document
           const timetableMeta = timetablesMap.get(schedule.timetableId);
           if (timetableMeta) {
             resolved.class = timetableMeta.class;
@@ -115,12 +239,10 @@ const TeacherOccupancy = () => {
             resolved.type = timetableMeta.type;
           }
           
-          // Resolve courseId to course display name
           if (schedule.courseId) {
             resolved.course = await getCourseDisplayName(schedule.courseId);
           }
           
-          // Resolve roomId to room display name
           if (schedule.roomId) {
             resolved.room = await getRoomDisplayName(schedule.roomId);
           }
@@ -129,41 +251,26 @@ const TeacherOccupancy = () => {
         })
       );
 
-      setTeachers(teachersData);
       setSchedules(resolvedSchedules);
 
-      // Extract unique faculties and departments
-      const uniqueFaculties = [...new Set(teachersData.map(t => t.faculty).filter(Boolean))].sort();
-      const uniqueDepartments = [...new Set(teachersData.map(t => t.department).filter(Boolean))].sort();
-      setFaculties(uniqueFaculties);
-      setDepartments(uniqueDepartments);
-
-      // Find the maximum rowIndex to determine the last time slot
-      let maxRowIndex = -1;
-      schedulesData.forEach((schedule) => {
+      // Generate time slots based on the maximum rowIndex
+      let maxRowIndex = DEFAULT_TIME_SLOTS.length - 1;
+      teacherSchedules.forEach((schedule) => {
         if (schedule.rowIndex !== undefined && schedule.rowIndex > maxRowIndex) {
           maxRowIndex = schedule.rowIndex;
         }
       });
 
-      console.log('📊 Maximum rowIndex found:', maxRowIndex);
-
-      // Generate time slots from 0 to maxRowIndex
       const generatedTimeSlots = [];
-      if (maxRowIndex >= 0) {
-        for (let i = 0; i <= maxRowIndex; i++) {
-          generatedTimeSlots.push(generateTimeSlot(i));
-        }
+      for (let i = 0; i <= maxRowIndex; i++) {
+        generatedTimeSlots.push(generateTimeSlot(i));
       }
-
-      console.log('📊 Generated time slots:', generatedTimeSlots);
       setTimeSlots(generatedTimeSlots);
-
     } catch (err) {
-      console.error("Error loading data:", err);
-      setError("Failed to load teacher occupancy data. Please try again.");
+      console.error("Error loading schedules for teacher:", err);
+      setError("Failed to load schedules for the selected teacher.");
     } finally {
-      setLoading(false);
+      setLoadingSchedule(false);
     }
   };
 
@@ -191,9 +298,6 @@ const TeacherOccupancy = () => {
       return teacherMatch && timeMatch && dayMatch;
     });
     
-    if (matches.length > 0) {
-      console.log(`✅ Found ${matches.length} matches for [Teacher ID: ${teacherId}, Row: ${rowIndex}, Day: ${dayKey} (Col: ${colIndex})]`);
-    }
     return matches;
   };
 
@@ -203,7 +307,7 @@ const TeacherOccupancy = () => {
     return String(teacher.unid || '');
   };
 
-  // Filtered teachers based on search and filters
+  // Filtered teachers based on search and filters (used by admin only)
   const filteredTeachers = useMemo(() => {
     return teachers.filter((teacher) => {
       const matchesSearch = searchQuery === "" || 
@@ -225,6 +329,35 @@ const TeacherOccupancy = () => {
   
   const handleExportExcel = () => {
     exportTeacherOccupancyToExcel(teachers, schedules, timeSlots, "teacher-occupancy");
+    setShowExportMenu(false);
+  };
+
+  const handleExportStaffPdf = () => {
+    exportStaffListToPdf(teachers, "dei-staff-list");
+    setShowExportMenu(false);
+  };
+
+  const handleExportIndividualPdf = () => {
+    if (!selectedTeacher) return;
+    exportIndividualTeacherOccupancyToPdf(selectedTeacher, schedules, timeSlots, `teacher-schedule-${selectedTeacher.ID || selectedTeacher.name}`);
+    setShowExportMenu(false);
+  };
+
+  const handleExportIndividualDailyPdf = () => {
+    if (!selectedTeacher) return;
+    exportTeacherOccupancyToPdf([selectedTeacher], schedules, timeSlots, `teacher-schedule-by-day-${selectedTeacher.ID || selectedTeacher.name}`);
+    setShowExportMenu(false);
+  };
+
+  const handleExportIndividualExcel = () => {
+    if (!selectedTeacher) return;
+    exportIndividualTeacherOccupancyToExcel(selectedTeacher, schedules, timeSlots, `teacher-schedule-${selectedTeacher.ID || selectedTeacher.name}`);
+    setShowExportMenu(false);
+  };
+
+  const handleExportIndividualDailyExcel = () => {
+    if (!selectedTeacher) return;
+    exportTeacherOccupancyToExcel([selectedTeacher], schedules, timeSlots, `teacher-schedule-by-day-${selectedTeacher.ID || selectedTeacher.name}`);
     setShowExportMenu(false);
   };
 
@@ -396,23 +529,31 @@ const TeacherOccupancy = () => {
 
   // Render teacher list for selection
   const renderTeacherList = () => {
+    const listToRender = filteredTeachers;
+
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden max-h-[600px] overflow-y-auto">
         <div className="sticky top-0 bg-gray-50 border-b border-gray-200 px-4 py-3">
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
-            Select Teacher ({filteredTeachers.length})
+            Select Teacher ({listToRender.length})
           </h3>
         </div>
         <div className="divide-y divide-gray-200">
-          {filteredTeachers.length === 0 ? (
+          {listToRender.length === 0 ? (
             <div className="px-4 py-8 text-center text-gray-500">
               No teachers found matching your criteria
             </div>
           ) : (
-            filteredTeachers.map((teacher) => (
+            listToRender.map((teacher) => (
               <button
                 key={teacher.unid}
-                onClick={() => setSelectedTeacher(teacher)}
+                onClick={() => {
+                  if (role === "teacher") {
+                    handleSelectTeacher(teacher);
+                  } else {
+                    setSelectedTeacher(teacher);
+                  }
+                }}
                 className={`w-full px-4 py-3 text-left hover:bg-green-50 transition-colors ${
                   selectedTeacher?.unid === teacher.unid ? "bg-green-100 border-l-4 border-l-green-600" : ""
                 }`}
@@ -439,83 +580,131 @@ const TeacherOccupancy = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Teacher Occupancy</h1>
             <p className="text-gray-600">
-              {viewMode === "all" 
+              {role === "teacher"
+                ? "Preview your weekly timetable schedule and export it"
+                : viewMode === "all"
                 ? "View which teachers are occupied at each time slot" 
                 : "View individual teacher's weekly schedule"}
             </p>
           </div>
           
           {/* View Switcher and Export Button */}
-          {!loading && teachers.length > 0 && (
+          {!loading && (role !== "teacher" ? teachers.length > 0 : true) && (
             <div className="flex items-center gap-3">
               {/* View Mode Switcher */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1 flex gap-1">
-                <button
-                  onClick={() => {
-                    setViewMode("all");
-                    setSelectedTeacher(null);
-                  }}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-                    viewMode === "all"
-                      ? "bg-green-600 text-white shadow-sm"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <LayoutGrid size={16} />
-                  All Teachers
-                </button>
-                <button
-                  onClick={() => setViewMode("individual")}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-                    viewMode === "individual"
-                      ? "bg-green-600 text-white shadow-sm"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <User size={16} />
-                  By Teacher
-                </button>
-              </div>
+              {role !== "teacher" && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1 flex gap-1">
+                  <button
+                    onClick={() => {
+                      setViewMode("all");
+                      setSelectedTeacher(null);
+                    }}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                      viewMode === "all"
+                        ? "bg-green-600 text-white shadow-sm"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    <LayoutGrid size={16} />
+                    All Teachers
+                  </button>
+                  <button
+                    onClick={() => setViewMode("individual")}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                      viewMode === "individual"
+                        ? "bg-green-600 text-white shadow-sm"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    <User size={16} />
+                    By Teacher
+                  </button>
+                </div>
+              )}
 
               {/* Export Button */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
-                >
-                  <Download size={18} />
-                  Export
-                  <ChevronDown size={16} />
-                </button>
-                
-                {showExportMenu && (
-                  <>
-                    {/* Backdrop */}
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowExportMenu(false)}
-                    />
-                    
-                    {/* Dropdown Menu */}
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                      <button
-                        onClick={handleExportPdf}
-                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                      >
-                        <Download size={16} />
-                        Export as PDF
-                      </button>
-                      <button
-                        onClick={handleExportExcel}
-                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                      >
-                        <Download size={16} />
-                        Export as Excel
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+              {(selectedTeacher || (role !== "teacher" && teachers.length > 0)) && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
+                  >
+                    <Download size={18} />
+                    Export
+                    <ChevronDown size={16} />
+                  </button>
+                  
+                  {showExportMenu && (
+                    <>
+                      {/* Backdrop */}
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowExportMenu(false)}
+                      />
+                      
+                      {/* Dropdown Menu */}
+                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                        {role !== "teacher" && viewMode === "all" ? (
+                          <>
+                            <button
+                              onClick={handleExportPdf}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                            >
+                              <Download size={16} />
+                              Export as PDF (By Day)
+                            </button>
+                            <button
+                              onClick={handleExportExcel}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                            >
+                              <Download size={16} />
+                              Export as Excel (By Day)
+                            </button>
+                            <button
+                              onClick={handleExportStaffPdf}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 border-t border-gray-100"
+                            >
+                              <Download size={16} />
+                              Export Staff List (PDF)
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={handleExportIndividualPdf}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                            >
+                              <Download size={16} />
+                              Export PDF (Weekly Grid - 1 Page)
+                            </button>
+                            <button
+                              onClick={handleExportIndividualDailyPdf}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                            >
+                              <Download size={16} />
+                              Export PDF (Daily - Multi Page)
+                            </button>
+                            <button
+                              onClick={handleExportIndividualExcel}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 border-t border-gray-100"
+                            >
+                              <Download size={16} />
+                              Export Excel (Weekly Grid)
+                            </button>
+                            <button
+                              onClick={handleExportIndividualDailyExcel}
+                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                            >
+                              <Download size={16} />
+                              Export Excel (By Day)
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -618,13 +807,20 @@ const TeacherOccupancy = () => {
 
                   {/* Teacher Occupancy Grid - 2/3 width on large screens */}
                   <div className="lg:col-span-2">
-                    {renderIndividualView()}
+                    {loadingSchedule ? (
+                      <div className="flex flex-col items-center justify-center bg-white rounded-lg border border-gray-200 shadow-sm p-12 min-h-[300px]">
+                        <Loader2 className="w-8 h-8 animate-spin text-green-600 mb-3" />
+                        <p className="text-gray-500 font-medium">Loading schedule...</p>
+                      </div>
+                    ) : (
+                      renderIndividualView()
+                    )}
                   </div>
                 </div>
               </>
             )}
 
-            {viewMode === "all" && (
+            {viewMode === "all" && role !== "teacher" && (
               <>
                 {/* Day Tabs */}
                 <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-1 flex gap-1 overflow-x-auto">

@@ -26,6 +26,7 @@ const RoomAvailabilityExportModal = ({ isOpen, onClose, rooms = [], timeSlots = 
   const [loading, setLoading] = useState(false);
   const [allRooms, setAllRooms] = useState([]);
   const [loadingAll, setLoadingAll] = useState(false);
+  const [mobilePdfLayout, setMobilePdfLayout] = useState("multi"); // "single" | "multi"
 
   const currentDay = DAYS[currentDayIndex];
 
@@ -124,7 +125,7 @@ const RoomAvailabilityExportModal = ({ isOpen, onClose, rooms = [], timeSlots = 
 
       if (exportSize === "mobile") {
         exportFormat === "pdf"
-          ? exportRoomAvailabilityToPdfMobile(activeRooms, timeSlots, scopeLabel, name)
+          ? exportRoomAvailabilityToPdfMobile(activeRooms, timeSlots, scopeLabel, name, mobilePdfLayout)
           : exportRoomAvailabilityToExcelMobile(activeRooms, timeSlots, scopeLabel, name);
       } else {
         exportFormat === "pdf"
@@ -298,6 +299,23 @@ const RoomAvailabilityExportModal = ({ isOpen, onClose, rooms = [], timeSlots = 
                     className="p-1.5 hover:bg-gray-200 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                     <ChevronRight size={18} />
                   </button>
+                </div>
+                <div className="border-l border-gray-300 h-6" />
+              </>
+            )}
+            {exportSize === "mobile" && exportFormat === "pdf" && (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-700">Layout:</span>
+                  {[
+                    { v: "single", label: "Single Page" },
+                    { v: "multi", label: "Multi Page" },
+                  ].map(({ v, label }) => (
+                    <label key={v} className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" value={v} checked={mobilePdfLayout === v} onChange={() => setMobilePdfLayout(v)} className="w-4 h-4 accent-green-600" />
+                      <span className="text-gray-700">{label}</span>
+                    </label>
+                  ))}
                 </div>
                 <div className="border-l border-gray-300 h-6" />
               </>
