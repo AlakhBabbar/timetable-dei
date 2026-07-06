@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime
 
-from app.models import TeacherCreate, TeacherOut
-from app.database import teachers_collection
-from app.dependencies import get_current_user, require_role
-from app.audit_logs import log_action
+from app.models.models import TeacherCreate, TeacherOut
+from app.core.database import teachers_collection
+from app.services.dependencies import get_current_user, require_role
+from app.routes.audit_logs import log_action
 
 router = APIRouter(prefix="/api/teachers", tags=["teachers"])
 

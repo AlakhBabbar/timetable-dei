@@ -3,8 +3,8 @@ from fastapi.security import OAuth2PasswordBearer
 from bson import ObjectId
 from bson.errors import InvalidId
 
-from app.security import decode_access_token
-from app.database import users_collection
+from app.services.security import decode_access_token
+from app.core.database import users_collection
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 

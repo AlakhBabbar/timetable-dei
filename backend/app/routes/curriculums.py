@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 
-from app.models import CurriculumIn
-from app.database import curriculums_collection
-from app.dependencies import get_current_user, require_role
-from app.timetable_helpers import normalize
-from app.audit_logs import log_action
+from app.models.models import CurriculumIn
+from app.core.database import curriculums_collection
+from app.services.dependencies import get_current_user, require_role
+from app.services.timetable_helpers import normalize
+from app.routes.audit_logs import log_action
 
 router = APIRouter(prefix="/api/curriculums", tags=["curriculums"])
 

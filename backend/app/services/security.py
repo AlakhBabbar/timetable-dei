@@ -1,7 +1,7 @@
 import bcrypt
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
-from app.config import settings
+from app.core.config import settings
 
 # ── Password hashing ──────────────────────────────────────────────────────
 def hash_password(password: str) -> str:

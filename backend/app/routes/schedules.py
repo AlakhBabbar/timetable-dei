@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Query
 
-from app.models import SaveSchedulesRequest
-from app.database import schedules_collection
-from app.dependencies import get_current_user, require_role
-from app.timetable_helpers import normalize, safe_id
+from app.models.models import SaveSchedulesRequest
+from app.core.database import schedules_collection
+from app.services.dependencies import get_current_user, require_role
+from app.services.timetable_helpers import normalize, safe_id
 
 router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 

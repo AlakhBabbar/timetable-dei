@@ -1,20 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.auth import router as auth_router
-from app.rooms import router as rooms_router
-from app.teachers import router as teachers_router
-from app.courses import router as courses_router
-from app.schedules import router as schedules_router
-from app.timetables import router as timetables_router
-from app.curriculums import router as curriculums_router
-from app.settings import router as settings_router
-from app.audit_logs import router as audit_logs_router
-
-
-
-
-
+from app.routes.auth import router as auth_router
+from app.routes.rooms import router as rooms_router
+from app.routes.teachers import router as teachers_router
+from app.routes.courses import router as courses_router
+from app.routes.schedules import router as schedules_router
+from app.routes.timetables import router as timetables_router
+from app.routes.curriculums import router as curriculums_router
+from app.routes.settings import router as settings_router
+from app.routes.audit_logs import router as audit_logs_router
 
 app = FastAPI(title="Planovate API")
 

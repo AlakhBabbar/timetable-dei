@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 
-from app.models import TimetableMetaIn, SaveTimetableRequest
-from app.database import timetables_collection, schedules_collection
-from app.dependencies import get_current_user, require_role
-from app.audit_logs import log_action
-from app.timetable_helpers import (
+from app.models.models import TimetableMetaIn, SaveTimetableRequest
+from app.core.database import timetables_collection, schedules_collection
+from app.services.dependencies import get_current_user, require_role
+from app.routes.audit_logs import log_action
+from app.services.timetable_helpers import (
     normalize,
     generate_timetable_id,
     prepare_timetable_payload,
@@ -13,7 +13,7 @@ from app.timetable_helpers import (
     reconstruct_timetable_from_schedules,
     DEFAULT_DAYS,
 )
-from app.schedules import schedule_doc_id
+from app.routes.schedules import schedule_doc_id
 
 router = APIRouter(prefix="/api/timetables", tags=["timetables"])
 

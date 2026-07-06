@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime
 
-from app.models import RoomCreate, RoomOut
-from app.database import rooms_collection
-from app.dependencies import get_current_user, require_role
-from app.audit_logs import log_action
+from app.models.models import RoomCreate, RoomOut
+from app.core.database import rooms_collection
+from app.services.dependencies import get_current_user, require_role
+from app.routes.audit_logs import log_action
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 

@@ -1,8 +1,8 @@
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, Query
 
-from app.database import audit_logs_collection
-from app.dependencies import get_current_user
+from app.core.database import audit_logs_collection
+from app.services.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/audit-logs", tags=["audit-logs"])
 

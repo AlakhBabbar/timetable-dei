@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 
-from app.models import SaveProgramsRequest, SaveBranchesRequest
-from app.database import settings_collection
-from app.dependencies import get_current_user, require_role
-from app.audit_logs import log_action
+from app.models.models import SaveProgramsRequest, SaveBranchesRequest
+from app.core.database import settings_collection
+from app.services.dependencies import get_current_user, require_role
+from app.routes.audit_logs import log_action
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
