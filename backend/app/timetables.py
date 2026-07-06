@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from app.models import TimetableMetaIn, SaveTimetableRequest
 from app.database import timetables_collection, schedules_collection
 from app.dependencies import get_current_user, require_role
+from app.audit_logs import log_action
 from app.timetable_helpers import (
     normalize,
     generate_timetable_id,
@@ -104,6 +105,7 @@ async def create_timetable_preset(meta: TimetableMetaIn, user: dict = Depends(re
         "createdAt": now,
     }
     await timetables_collection.insert_one(doc)
+    await log_action(user, "create_timetable_preset", f"Timetable preset created: {timetable_id}")
     return _strip_id(doc)
 
 
@@ -145,6 +147,7 @@ async def update_timetable_meta(
         # preserving it rather than fixing it, per scope.
 
     saved = await timetables_collection.find_one({"_id": new_timetable_id})
+    await log_action(user, "update_timetable_meta", f"Timetable metadata updated: {new_timetable_id}")
     return _strip_id(saved)
 
 
@@ -191,6 +194,7 @@ async def save_timetable(payload: SaveTimetableRequest, user: dict = Depends(req
         await schedules_collection.delete_many({"_id": {"$in": list(orphaned)}})
 
     saved_meta = await timetables_collection.find_one({"_id": timetable_id})
+    await log_action(user, "save_timetable", f"Timetable {timetable_id} saved/updated")
     return {
         "timetableId": timetable_id,
         "meta": _strip_id(saved_meta),
@@ -205,3 +209,4 @@ async def delete_timetable(timetable_id: str, user: dict = Depends(require_role(
     result = await timetables_collection.delete_one({"_id": timetable_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Timetable not found")
+    await log_action(user, "delete_timetable", f"Timetable {timetable_id} deleted")

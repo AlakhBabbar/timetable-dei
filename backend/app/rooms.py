@@ -4,6 +4,7 @@ from datetime import datetime
 from app.models import RoomCreate, RoomOut
 from app.database import rooms_collection
 from app.dependencies import get_current_user, require_role
+from app.audit_logs import log_action
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 
@@ -69,6 +70,7 @@ async def upsert_room(
         await rooms_collection.insert_one(doc)
 
     saved = await rooms_collection.find_one({"_id": unid})
+    await log_action(user, "upsert_room", f"Room {saved['name']} updated/created")
     return room_to_out(saved)
 
 
@@ -77,3 +79,4 @@ async def delete_room(unid: int, user: dict = Depends(require_role("admin", "tt_
     result = await rooms_collection.delete_one({"_id": unid})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Room not found")
+    await log_action(user, "delete_room", f"Room ID {unid} deleted")

@@ -4,6 +4,7 @@ from datetime import datetime
 from app.models import CourseCreate, CourseOut
 from app.database import courses_collection
 from app.dependencies import get_current_user, require_role
+from app.audit_logs import log_action
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
 
@@ -92,11 +93,13 @@ async def upsert_course(
         await courses_collection.insert_one(doc)
 
     saved = await courses_collection.find_one({"_id": unid})
+    course_label = saved.get("code") or saved.get("name")
+    await log_action(user, "upsert_course", f"Course {course_label} updated/created")
     return course_to_out(saved)
-
 
 @router.delete("/{unid}", status_code=204)
 async def delete_course(unid: int, user: dict = Depends(require_role("admin", "tt_incharge"))):
     result = await courses_collection.delete_one({"_id": unid})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Course not found")
+    await log_action(user, "delete_course", f"Course ID {unid} deleted")

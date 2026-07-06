@@ -161,3 +161,39 @@ class SaveTimetableRequest(BaseModel):
     timeSlots: list[str] = []
     batchesByTable: dict = {}
     batchDataByTable: dict = {}
+
+# ── Curriculums ──────────────────────────────────────────────────────────
+class CurriculumIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    className: str
+    branch: str
+    semester: str
+    type: str
+    courses: list[dict] = []
+    # NOTE: `courses` entries are polymorphic — either
+    #   {unid, name, code, credits}          (manual entry, Curriculum.jsx)
+    # or
+    #   {courseId, teacherIds: [...]}         (auto-extracted, CurriculumModal.jsx)
+    # Left as list[dict] on purpose so neither flow's payload gets coerced/rejected.
+
+# ── Settings ─────────────────────────────────────────────────────────────
+class SaveProgramsRequest(BaseModel):
+    programs: list[str] = []
+
+
+class BranchEntry(BaseModel):
+    name: str
+    programs: list[str] = []
+
+
+class SaveBranchesRequest(BaseModel):
+    branches: list[BranchEntry] = []
+
+
+# ── Audit Logs ───────────────────────────────────────────────────────────
+class AuditLogEntry(BaseModel):
+    user: str
+    action: str
+    details: str
+    timestamp: datetime

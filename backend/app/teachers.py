@@ -4,6 +4,7 @@ from datetime import datetime
 from app.models import TeacherCreate, TeacherOut
 from app.database import teachers_collection
 from app.dependencies import get_current_user, require_role
+from app.audit_logs import log_action
 
 router = APIRouter(prefix="/api/teachers", tags=["teachers"])
 
@@ -69,6 +70,7 @@ async def upsert_teacher(
         await teachers_collection.insert_one(doc)
 
     saved = await teachers_collection.find_one({"_id": unid})
+    await log_action(user, "upsert_teacher", f"Teacher {saved['name']} updated/created")
     return teacher_to_out(saved)
 
 
@@ -77,3 +79,4 @@ async def delete_teacher(unid: int, user: dict = Depends(require_role("admin", "
     result = await teachers_collection.delete_one({"_id": unid})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Teacher not found")
+    await log_action(user, "delete_teacher", f"Teacher ID {unid} deleted")
