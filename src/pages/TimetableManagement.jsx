@@ -24,13 +24,14 @@ import { timetableService, settingsService, curriculumService } from "../firebas
 import { resolveBatchDataForDisplay, convertDisplayToIds } from "../utils/idDisplayHelpers";
 import { validateAllBatchData, hasValidationErrors, getValidationSummary } from "../utils/validationHelpers";
 import { buildDraftRoomBookings, filterRoomBookings, mergeRoomBookingsMaps } from "../firebase/services/roomBookings";
+import { buildDraftTeacherBookings, filterTeacherBookings, mergeTeacherBookingsMaps } from "../firebase/services/teacherBookings";
 
 // Generate unique table ID for internal use
 const generateUniqueTableId = () => `table_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 const Timetable = () => {
   // Zustand store for global options
-  const { courseOptions, teacherOptions, roomOptions, semesterOptions, fetchOptions, fetchTimetables, allCoursesRaw, allTeachersRaw, allRoomsRaw, roomBookings, fetchRoomBookings, refetchRoomBookings } = useTimetableStore();
+  const { courseOptions, teacherOptions, roomOptions, semesterOptions, fetchOptions, fetchTimetables, allCoursesRaw, allTeachersRaw, allRoomsRaw, roomBookings, fetchRoomBookings, refetchRoomBookings, teacherBookings, fetchTeacherBookings, refetchTeacherBookings } = useTimetableStore();
   
   // Generate initial unique table ID
   const [tables, setTables] = useState(() => [generateUniqueTableId()]);
@@ -93,6 +94,11 @@ const Timetable = () => {
   useEffect(() => {
     fetchRoomBookings();
   }, [fetchRoomBookings]);
+
+  // Fetch teacher bookings on mount
+  useEffect(() => {
+    fetchTeacherBookings();
+  }, [fetchTeacherBookings]);
 
   // Fetch programs and branches from settings
   useEffect(() => {
@@ -545,6 +551,23 @@ const Timetable = () => {
     return mergeRoomBookingsMaps(persistedBookings, draftBookings);
   }, [tabMetadata, roomBookings, tables, batches, batchData, timeSlots]);
 
+  const effectiveTeacherBookings = React.useMemo(() => {
+    const openTimetableIds = Object.values(tabMetadata)
+      .map((meta) => String(meta?.timetableId || "").trim())
+      .filter(Boolean);
+
+    const persistedBookings = filterTeacherBookings(teacherBookings, openTimetableIds);
+    const draftBookings = buildDraftTeacherBookings({
+      tables,
+      tabMetadata,
+      batchesByTable: batches,
+      batchDataByTable: batchData,
+      timeSlots,
+    });
+
+    return mergeTeacherBookingsMaps(persistedBookings, draftBookings);
+  }, [tabMetadata, teacherBookings, tables, batches, batchData, timeSlots]);
+
 
   // Keyboard navigation handlers
   const handleSemesterKeyDown = (e) => {
@@ -694,6 +717,7 @@ const Timetable = () => {
       }));
       // Refresh room bookings cache after save
       refetchRoomBookings();
+      refetchTeacherBookings();
       alert(`✅ Timetable saved successfully! (ID: ${id})`);
     } catch (error) {
       console.error("Error saving timetable:", error);
@@ -928,6 +952,7 @@ const Timetable = () => {
             allCoursesRaw={allCoursesRaw}
             allTeachersRaw={allTeachersRaw}
             roomBookings={effectiveRoomBookings}
+            teacherBookings={effectiveTeacherBookings}
             allRoomsRaw={allRoomsRaw}
             currentTabMeta={tabMetadata[activeTable] || {}}
             currentTableKey={activeTable}

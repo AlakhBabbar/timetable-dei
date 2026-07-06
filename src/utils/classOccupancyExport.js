@@ -892,31 +892,18 @@ export function exportClassOccupancyToPdfMobile(classes, schedules, timeSlots, f
           if (data.section !== "body") return;
           if (data.row.raw.isSpacer) {
             const d = data.doc;
-            d.setDrawColor(15, 23, 42); // dark slate
+            d.setDrawColor(0, 0, 0); // Solid black
             d.setLineWidth(0.4);
             const startX = data.cell.x;
             const startY = data.cell.y + data.cell.height / 2;
             const endX = data.cell.x + data.cell.width;
             const endY = data.cell.y + data.cell.height / 2;
             d.line(startX, startY, endX, endY);
-          } else if (data.row.raw.isDayEnd && data.row.index === data.table.body.length - 1) {
+          } else {
+            // Draw a solid black line after each row
             const d = data.doc;
-            d.setDrawColor(15, 23, 42);
-            d.setLineWidth(0.45);
-            const startX = data.cell.x;
-            const startY = data.cell.y + data.cell.height;
-            const endX = data.cell.x + data.cell.width;
-            const endY = data.cell.y + data.cell.height;
-            d.line(startX, startY, endX, endY);
-          } else if (!data.row.raw.isDayEnd) {
-            const d = data.doc;
-            if (data.row.raw.isBranchEnd) {
-              d.setDrawColor(100, 116, 139); // slate-400
-              d.setLineWidth(0.15);
-            } else {
-              d.setDrawColor(203, 213, 225); // slate-300
-              d.setLineWidth(0.08);
-            }
+            d.setDrawColor(0, 0, 0); // Solid black
+            d.setLineWidth(0.22); // Solid line width
             const startX = data.cell.x;
             const startY = data.cell.y + data.cell.height;
             const endX = data.cell.x + data.cell.width;

@@ -28,7 +28,7 @@ const TeacherOccupancy = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   
   // New state for individual teacher view
-  const [viewMode, setViewMode] = useState("all"); // "all" or "individual"
+  const [viewMode, setViewMode] = useState("individual"); // "all" or "individual"
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFaculty, setSelectedFaculty] = useState("");
@@ -90,104 +90,24 @@ const TeacherOccupancy = () => {
       setLoading(true);
       setError(null);
 
-      if (role === "teacher") {
-        const teachersData = await teacherService.listTeachers();
-        setTeachers(teachersData);
+      // Fetch only teachers list on mount
+      const teachersData = await teacherService.listTeachers();
+      setTeachers(teachersData);
 
-        // Extract unique faculties and departments
-        const uniqueFaculties = [...new Set(teachersData.map(t => t.faculty).filter(Boolean))].sort();
-        const uniqueDepartments = [...new Set(teachersData.map(t => t.department).filter(Boolean))].sort();
-        setFaculties(uniqueFaculties);
-        setDepartments(uniqueDepartments);
+      // Extract unique faculties and departments
+      const uniqueFaculties = [...new Set(teachersData.map(t => t.faculty).filter(Boolean))].sort();
+      const uniqueDepartments = [...new Set(teachersData.map(t => t.department).filter(Boolean))].sort();
+      setFaculties(uniqueFaculties);
+      setDepartments(uniqueDepartments);
 
-        setViewMode("individual");
-      } else {
-        const [teachersData, schedulesData] = await Promise.all([
-          teacherService.listTeachers(),
-          getAllSchedules(),
-        ]);
-
-        console.log('📊 Loaded schedules:', schedulesData.length);
-        console.log('📊 Sample schedule:', schedulesData[0]);
-        console.log('📊 Loaded teachers:', teachersData.length);
-        console.log('📊 Sample teacher:', teachersData[0]);
-
-        // Get unique timetable IDs from schedules
-        const uniqueTimetableIds = [...new Set(schedulesData.map(s => s.timetableId).filter(Boolean))];
-        
-        // Fetch timetable metadata for all unique IDs
-        const timetablesMap = new Map();
-        await Promise.all(
-          uniqueTimetableIds.map(async (timetableId) => {
-            try {
-              const timetableData = await timetableService.loadTimetable(timetableId);
-              if (timetableData && timetableData.meta) {
-                timetablesMap.set(timetableId, timetableData.meta);
-              }
-            } catch (err) {
-              console.warn(`Failed to load timetable metadata for ${timetableId}:`, err);
-            }
-          })
-        );
-
-        // Resolve IDs to display names and add metadata from timetable
-        const resolvedSchedules = await Promise.all(
-          schedulesData.map(async (schedule) => {
-            const resolved = { ...schedule };
-            
-            // Get metadata from timetable document
-            const timetableMeta = timetablesMap.get(schedule.timetableId);
-            if (timetableMeta) {
-              resolved.class = timetableMeta.class;
-              resolved.branch = timetableMeta.branch;
-              resolved.semester = timetableMeta.semester;
-              resolved.type = timetableMeta.type;
-            }
-            
-            // Resolve courseId to course display name
-            if (schedule.courseId) {
-              resolved.course = await getCourseDisplayName(schedule.courseId);
-            }
-            
-            // Resolve roomId to room display name
-            if (schedule.roomId) {
-              resolved.room = await getRoomDisplayName(schedule.roomId);
-            }
-            
-            return resolved;
-          })
-        );
-
-        setTeachers(teachersData);
-        setSchedules(resolvedSchedules);
-
-        // Extract unique faculties and departments
-        const uniqueFaculties = [...new Set(teachersData.map(t => t.faculty).filter(Boolean))].sort();
-        const uniqueDepartments = [...new Set(teachersData.map(t => t.department).filter(Boolean))].sort();
-        setFaculties(uniqueFaculties);
-        setDepartments(uniqueDepartments);
-
-        // Find the maximum rowIndex to determine the last time slot
-        let maxRowIndex = -1;
-        schedulesData.forEach((schedule) => {
-          if (schedule.rowIndex !== undefined && schedule.rowIndex > maxRowIndex) {
-            maxRowIndex = schedule.rowIndex;
-          }
-        });
-
-        console.log('📊 Maximum rowIndex found:', maxRowIndex);
-
-        // Generate time slots from 0 to maxRowIndex
-        const generatedTimeSlots = [];
-        if (maxRowIndex >= 0) {
-          for (let i = 0; i <= maxRowIndex; i++) {
-            generatedTimeSlots.push(generateTimeSlot(i));
-          }
-        }
-
-        console.log('📊 Generated time slots:', generatedTimeSlots);
-        setTimeSlots(generatedTimeSlots);
+      // Generate default time slots
+      const generatedTimeSlots = [];
+      for (let i = 0; i < DEFAULT_TIME_SLOTS.length; i++) {
+        generatedTimeSlots.push(generateTimeSlot(i));
       }
+      setTimeSlots(generatedTimeSlots);
+
+      setViewMode("individual");
 
     } catch (err) {
       console.error("Error loading data:", err);
@@ -204,10 +124,12 @@ const TeacherOccupancy = () => {
     setSchedules([]);
 
     try {
-      // Query schedules for only this teacher
-      const schedulesCol = collection(db, "schedules");
-      const snap = await getDocs(query(schedulesCol, where("teacherId", "==", String(teacher.unid))));
-      const teacherSchedules = snap.docs.map((d) => d.data());
+      // Fetch all schedules (cached) and filter in memory to support multiple teachers
+      const allSchedulesList = await getAllSchedules();
+      const teacherSchedules = allSchedulesList.filter((s) => {
+        const teacherIds = s.teacherId ? String(s.teacherId).split(',').map(id => id.trim()).filter(Boolean) : [];
+        return teacherIds.includes(String(teacher.unid));
+      });
 
       // Fetch metadata for only the timetables associated with this teacher's schedules
       const uniqueTimetableIds = [...new Set(teacherSchedules.map((s) => s.timetableId).filter(Boolean))];
@@ -289,7 +211,8 @@ const TeacherOccupancy = () => {
     
     const matches = schedules.filter((s) => {
       // Match by teacher document ID (teacherId)
-      const teacherMatch = s.teacherId && String(s.teacherId) === String(teacherId);
+      const teacherIds = s.teacherId ? String(s.teacherId).split(',').map(id => id.trim()).filter(Boolean) : [];
+      const teacherMatch = teacherIds.includes(String(teacherId));
       // Match by rowIndex (time slot)
       const timeMatch = s.rowIndex === rowIndex;
       // Match by colIndex (day)
@@ -547,13 +470,7 @@ const TeacherOccupancy = () => {
             listToRender.map((teacher) => (
               <button
                 key={teacher.unid}
-                onClick={() => {
-                  if (role === "teacher") {
-                    handleSelectTeacher(teacher);
-                  } else {
-                    setSelectedTeacher(teacher);
-                  }
-                }}
+                onClick={() => handleSelectTeacher(teacher)}
                 className={`w-full px-4 py-3 text-left hover:bg-green-50 transition-colors ${
                   selectedTeacher?.unid === teacher.unid ? "bg-green-100 border-l-4 border-l-green-600" : ""
                 }`}
@@ -594,10 +511,75 @@ const TeacherOccupancy = () => {
               {/* View Mode Switcher */}
               {role !== "teacher" && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1 flex gap-1">
-                  <button
-                    onClick={() => {
+                   <button
+                    onClick={async () => {
                       setViewMode("all");
                       setSelectedTeacher(null);
+                      if (schedules.length === 0) {
+                        setLoading(true);
+                        try {
+                          const schedulesData = await getAllSchedules();
+                          
+                          // Get unique timetable IDs from schedules
+                          const uniqueTimetableIds = [...new Set(schedulesData.map(s => s.timetableId).filter(Boolean))];
+                          
+                          // Fetch timetable metadata for all unique IDs
+                          const timetablesMap = new Map();
+                          await Promise.all(
+                            uniqueTimetableIds.map(async (timetableId) => {
+                              try {
+                                const timetableData = await timetableService.loadTimetable(timetableId);
+                                if (timetableData && timetableData.meta) {
+                                  timetablesMap.set(timetableId, timetableData.meta);
+                                }
+                              } catch (err) {
+                                console.warn(`Failed to load timetable metadata for ${timetableId}:`, err);
+                              }
+                            })
+                          );
+
+                          // Resolve IDs to display names and add metadata from timetable
+                          const resolvedSchedules = await Promise.all(
+                            schedulesData.map(async (schedule) => {
+                              const resolved = { ...schedule };
+                              const timetableMeta = timetablesMap.get(schedule.timetableId);
+                              if (timetableMeta) {
+                                resolved.class = timetableMeta.class;
+                                resolved.branch = timetableMeta.branch;
+                                resolved.semester = timetableMeta.semester;
+                                resolved.type = timetableMeta.type;
+                              }
+                              if (schedule.courseId) {
+                                resolved.course = await getCourseDisplayName(schedule.courseId);
+                              }
+                              if (schedule.roomId) {
+                                resolved.room = await getRoomDisplayName(schedule.roomId);
+                              }
+                              return resolved;
+                            })
+                          );
+
+                          setSchedules(resolvedSchedules);
+
+                          // Find maxRowIndex
+                          let maxRowIndex = DEFAULT_TIME_SLOTS.length - 1;
+                          schedulesData.forEach((schedule) => {
+                            if (schedule.rowIndex !== undefined && schedule.rowIndex > maxRowIndex) {
+                              maxRowIndex = schedule.rowIndex;
+                            }
+                          });
+                          const generatedTimeSlots = [];
+                          for (let i = 0; i <= maxRowIndex; i++) {
+                            generatedTimeSlots.push(generateTimeSlot(i));
+                          }
+                          setTimeSlots(generatedTimeSlots);
+                        } catch (err) {
+                          console.error("Error loading all schedules:", err);
+                          setError("Failed to load all schedules.");
+                        } finally {
+                          setLoading(false);
+                        }
+                      }
                     }}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
                       viewMode === "all"

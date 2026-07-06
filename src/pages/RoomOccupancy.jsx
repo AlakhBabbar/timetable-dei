@@ -8,6 +8,8 @@ import { getAllSchedules } from "../firebase/services/schedules";
 import { DEFAULT_TIME_SLOTS } from "../utils/timetableUIHelpers";
 import { getCourseDisplayName, getTeacherDisplayName } from "../utils/idDisplayHelpers";
 import { exportRoomOccupancyToPdf, exportRoomOccupancyToExcel, exportRoomOccupancyToPdfMobile, exportRoomOccupancyToExcelMobile } from "../utils/roomOccupancyExport";
+import { db } from "../firebase/firebaseConfig";
+import { collection, getDocs, query, where } from "firebase/firestore";
 
 const RoomOccupancy = () => {
   const [rooms, setRooms] = useState([]);
@@ -22,7 +24,8 @@ const RoomOccupancy = () => {
   const [showPreviewIndividualModal, setShowPreviewIndividualModal] = useState(false);
   
   // New state for individual room view
-  const [viewMode, setViewMode] = useState("all"); // "all" or "individual"
+  const [viewMode, setViewMode] = useState("individual"); // "all" or "individual"
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFaculty, setSelectedFaculty] = useState("");
@@ -85,88 +88,19 @@ const RoomOccupancy = () => {
       setLoading(true);
       setError(null);
 
-      const [roomsData, schedulesData] = await Promise.all([
-        roomService.listRooms(),
-        getAllSchedules(),
-      ]);
-
-      console.log('📊 Loaded schedules:', schedulesData.length);
-      console.log('📊 Sample schedule:', schedulesData[0]);
-      console.log('📊 Loaded rooms:', roomsData.length);
-      console.log('📊 Sample room:', roomsData[0]);
-
-      // Get unique timetable IDs from schedules
-      const uniqueTimetableIds = [...new Set(schedulesData.map(s => s.timetableId).filter(Boolean))];
-      
-      // Fetch timetable metadata for all unique IDs
-      const timetablesMap = new Map();
-      await Promise.all(
-        uniqueTimetableIds.map(async (timetableId) => {
-          try {
-            const timetableData = await timetableService.loadTimetable(timetableId);
-            if (timetableData && timetableData.meta) {
-              timetablesMap.set(timetableId, timetableData.meta);
-            }
-          } catch (err) {
-            console.warn(`Failed to load timetable metadata for ${timetableId}:`, err);
-          }
-        })
-      );
-
-      // Resolve IDs to display names and add metadata from timetable
-      const resolvedSchedules = await Promise.all(
-        schedulesData.map(async (schedule) => {
-          const resolved = { ...schedule };
-          
-          // Get metadata from timetable document
-          const timetableMeta = timetablesMap.get(schedule.timetableId);
-          if (timetableMeta) {
-            resolved.class = timetableMeta.class;
-            resolved.branch = timetableMeta.branch;
-            resolved.semester = timetableMeta.semester;
-            resolved.type = timetableMeta.type;
-          }
-          
-          // Resolve courseId to course display name
-          if (schedule.courseId) {
-            resolved.course = await getCourseDisplayName(schedule.courseId);
-          }
-          
-          // Resolve teacherId to teacher display name
-          if (schedule.teacherId) {
-            resolved.teacher = await getTeacherDisplayName(schedule.teacherId);
-          }
-          
-          return resolved;
-        })
-      );
-
+      // Fetch only rooms on mount
+      const roomsData = await roomService.listRooms();
       setRooms(roomsData);
-      setSchedules(resolvedSchedules);
 
       // Extract unique faculties
       const uniqueFaculties = [...new Set(roomsData.map(r => r.faculty).filter(Boolean))].sort();
       setFaculties(uniqueFaculties);
 
-      // Find the maximum rowIndex to determine the last time slot
-      let maxRowIndex = -1;
-      schedulesData.forEach((schedule) => {
-        if (schedule.rowIndex !== undefined && schedule.rowIndex > maxRowIndex) {
-          maxRowIndex = schedule.rowIndex;
-        }
-      });
-
-      console.log('📊 Maximum rowIndex found:', maxRowIndex);
-
-      // Generate time slots from 0 to maxRowIndex
+      // Generate default time slots
       const generatedTimeSlots = [];
-      if (maxRowIndex >= 0) {
-        for (let i = 0; i <= maxRowIndex; i++) {
-          generatedTimeSlots.push(generateTimeSlot(i));
-        }
+      for (let i = 0; i < DEFAULT_TIME_SLOTS.length; i++) {
+        generatedTimeSlots.push(generateTimeSlot(i));
       }
-
-      console.log('📊 Generated time slots:', generatedTimeSlots);
       setTimeSlots(generatedTimeSlots);
 
     } catch (err) {
@@ -174,6 +108,78 @@ const RoomOccupancy = () => {
       setError("Failed to load room occupancy data. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resolveSchedulesList = async (schedulesData) => {
+    const uniqueTimetableIds = [...new Set(schedulesData.map(s => s.timetableId).filter(Boolean))];
+    const timetablesMap = new Map();
+    await Promise.all(
+      uniqueTimetableIds.map(async (timetableId) => {
+        try {
+          const timetableData = await timetableService.loadTimetable(timetableId);
+          if (timetableData && timetableData.meta) {
+            timetablesMap.set(timetableId, timetableData.meta);
+          }
+        } catch (err) {
+          console.warn(`Failed to load timetable metadata for ${timetableId}:`, err);
+        }
+      })
+    );
+
+    return await Promise.all(
+      schedulesData.map(async (schedule) => {
+        const resolved = { ...schedule };
+        const timetableMeta = timetablesMap.get(schedule.timetableId);
+        if (timetableMeta) {
+          resolved.class = timetableMeta.class;
+          resolved.branch = timetableMeta.branch;
+          resolved.semester = timetableMeta.semester;
+          resolved.type = timetableMeta.type;
+        }
+        if (schedule.courseId) {
+          resolved.course = await getCourseDisplayName(schedule.courseId);
+        }
+        if (schedule.teacherId) {
+          resolved.teacher = await getTeacherDisplayName(schedule.teacherId);
+        }
+        return resolved;
+      })
+    );
+  };
+
+  const handleSelectRoom = async (room) => {
+    setSelectedRoom(room);
+    setLoadingSchedule(true);
+    setError(null);
+    setSchedules([]);
+
+    try {
+      const schedulesCol = collection(db, "schedules");
+      const snap = await getDocs(query(schedulesCol, where("roomId", "==", String(room.unid))));
+      const roomSchedules = snap.docs.map((d) => d.data());
+
+      const resolved = await resolveSchedulesList(roomSchedules);
+      setSchedules(resolved);
+
+      // Generate time slots based on maximum rowIndex
+      let maxRowIndex = DEFAULT_TIME_SLOTS.length - 1;
+      roomSchedules.forEach((schedule) => {
+        if (schedule.rowIndex !== undefined && schedule.rowIndex > maxRowIndex) {
+          maxRowIndex = schedule.rowIndex;
+        }
+      });
+
+      const generatedTimeSlots = [];
+      for (let i = 0; i <= maxRowIndex; i++) {
+        generatedTimeSlots.push(generateTimeSlot(i));
+      }
+      setTimeSlots(generatedTimeSlots);
+    } catch (err) {
+      console.error("Error loading schedules for room:", err);
+      setError("Failed to load schedules for the selected room.");
+    } finally {
+      setLoadingSchedule(false);
     }
   };
 
@@ -459,7 +465,7 @@ const RoomOccupancy = () => {
             filteredRooms.map((room) => (
               <button
                 key={room.unid}
-                onClick={() => setSelectedRoom(room)}
+                onClick={() => handleSelectRoom(room)}
                 className={`w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors ${
                   selectedRoom?.unid === room.unid ? "bg-blue-100 border-l-4 border-l-blue-600" : ""
                 }`}
@@ -499,9 +505,35 @@ const RoomOccupancy = () => {
               {/* View Mode Switcher */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1 flex gap-1">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setViewMode("all");
                     setSelectedRoom(null);
+                    if (schedules.length === 0) {
+                      setLoading(true);
+                      try {
+                        const schedulesData = await getAllSchedules();
+                        const resolved = await resolveSchedulesList(schedulesData);
+                        setSchedules(resolved);
+                        
+                        // Recalculate maxRowIndex
+                        let maxRowIndex = DEFAULT_TIME_SLOTS.length - 1;
+                        schedulesData.forEach((schedule) => {
+                          if (schedule.rowIndex !== undefined && schedule.rowIndex > maxRowIndex) {
+                            maxRowIndex = schedule.rowIndex;
+                          }
+                        });
+                        const generatedTimeSlots = [];
+                        for (let i = 0; i <= maxRowIndex; i++) {
+                          generatedTimeSlots.push(generateTimeSlot(i));
+                        }
+                        setTimeSlots(generatedTimeSlots);
+                      } catch (err) {
+                        console.error("Error loading all schedules:", err);
+                        setError("Failed to load all schedules.");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }
                   }}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
                     viewMode === "all"
@@ -659,7 +691,14 @@ const RoomOccupancy = () => {
 
                   {/* Room Occupancy Grid - 2/3 width on large screens */}
                   <div className="lg:col-span-2">
-                    {renderIndividualView()}
+                    {loadingSchedule ? (
+                      <div className="flex flex-col items-center justify-center bg-white rounded-lg border border-gray-200 shadow-sm p-12 min-h-[300px]">
+                        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-3" />
+                        <p className="text-gray-500 font-medium">Loading schedule...</p>
+                      </div>
+                    ) : (
+                      renderIndividualView()
+                    )}
                   </div>
                 </div>
               </>

@@ -6,4 +6,5 @@ export * as scheduleService from "./schedules";
 export * as curriculumService from "./curriculums";
 export * as settingsService from "./settings";
 export * as roomBookingService from "./roomBookings";
+export * as teacherBookingService from "./teacherBookings";
 export * as auditLogsService from "./auditLogs";

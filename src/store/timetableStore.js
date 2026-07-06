@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { courseService, roomService, teacherService, timetableService, roomBookingService } from '../firebase/services';
+import { courseService, roomService, teacherService, timetableService, roomBookingService, teacherBookingService } from '../firebase/services';
 
 /**
  * Zustand Store for Timetable Global State
@@ -25,6 +25,11 @@ const useTimetableStore = create((set, get) => ({
   roomBookings: {},
   isRoomBookingsLoaded: false,
   isLoadingRoomBookings: false,
+  
+  // Teacher bookings cache (teacherId -> [{ day, time, timetableId, class, branch }])
+  teacherBookings: {},
+  isTeacherBookingsLoaded: false,
+  isLoadingTeacherBookings: false,
   
   // Timetables cache
   allTimetables: [],
@@ -122,6 +127,31 @@ const useTimetableStore = create((set, get) => ({
   refetchRoomBookings: async () => {
     set({ isRoomBookingsLoaded: false });
     await get().fetchRoomBookings();
+  },
+
+  // Fetch teacher bookings from schedules collection
+  fetchTeacherBookings: async () => {
+    if (get().isLoadingTeacherBookings) return;
+    
+    set({ isLoadingTeacherBookings: true });
+    
+    try {
+      const bookings = await teacherBookingService.getAllTeacherBookings();
+      set({
+        teacherBookings: bookings || {},
+        isTeacherBookingsLoaded: true,
+        isLoadingTeacherBookings: false,
+      });
+    } catch (error) {
+      console.error("Error loading teacher bookings:", error);
+      set({ isLoadingTeacherBookings: false });
+    }
+  },
+  
+  // Force refresh teacher bookings (e.g., after saving a timetable)
+  refetchTeacherBookings: async () => {
+    set({ isTeacherBookingsLoaded: false });
+    await get().fetchTeacherBookings();
   },
   
   // Fetch all timetables (for browse modal)

@@ -30,7 +30,8 @@ function buildTeacherOccupancyGrid(teachers, schedules, timeSlots, dayKey, dayLa
     
     timeSlots.forEach((timeSlot, rowIndex) => {
       const matches = schedules.filter((s) => {
-        const teacherMatch = s.teacherId && String(s.teacherId) === teacherId;
+        const teacherIds = s.teacherId ? String(s.teacherId).split(',').map(id => id.trim()).filter(Boolean) : [];
+        const teacherMatch = teacherIds.includes(teacherId);
         const timeMatch = s.rowIndex === rowIndex;
         const dayMatch = s.colIndex === colIndex;
         return teacherMatch && timeMatch && dayMatch;
@@ -510,7 +511,8 @@ export function exportIndividualTeacherOccupancyToPdf(teacher, schedules, timeSl
       
       const colIndex = dayToColIndex[day.key];
       const matches = schedules.filter((s) => {
-        const teacherMatch = s.teacherId && String(s.teacherId) === teacherId;
+        const teacherIds = s.teacherId ? String(s.teacherId).split(',').map(id => id.trim()).filter(Boolean) : [];
+        const teacherMatch = teacherIds.includes(teacherId);
         const timeMatch = s.rowIndex === rowIndex;
         const dayMatch = s.colIndex === colIndex;
         return teacherMatch && timeMatch && dayMatch;
@@ -632,7 +634,8 @@ export function exportIndividualTeacherOccupancyToExcel(teacher, schedules, time
       
       const colIndex = dayToColIndex[day.key];
       const matches = schedules.filter((s) => {
-        const teacherMatch = s.teacherId && String(s.teacherId) === teacherId;
+        const teacherIds = s.teacherId ? String(s.teacherId).split(',').map(id => id.trim()).filter(Boolean) : [];
+        const teacherMatch = teacherIds.includes(teacherId);
         const timeMatch = s.rowIndex === rowIndex;
         const dayMatch = s.colIndex === colIndex;
         return teacherMatch && timeMatch && dayMatch;

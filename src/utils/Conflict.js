@@ -173,15 +173,22 @@ export function checkConflicts(params) {
 		}
 	}
 
-	const teacherNeedle = normalize(
-		field === "teacher" ? nextValue : (allEntries.find((e) => e.isTarget)?.teacher ?? "")
-	);
+	const teacherNeedleStr = field === "teacher" ? nextValue : (allEntries.find((e) => e.isTarget)?.teacher ?? "");
+	const teacherNeedles = teacherNeedleStr
+		? teacherNeedleStr.split(',').map(t => normalize(t)).filter(Boolean)
+		: [];
+
 	const roomNeedle = normalize(
 		field === "room" ? nextValue : (allEntries.find((e) => e.isTarget)?.room ?? "")
 	);
 
-	const teacherMatches = teacherNeedle
-		? allEntries.filter((e) => normalize(e.teacher) === teacherNeedle)
+	const teacherMatches = teacherNeedles.length > 0
+		? allEntries.filter((e) => {
+			const eTeachers = e.teacher
+				? e.teacher.split(',').map(t => normalize(t)).filter(Boolean)
+				: [];
+			return eTeachers.some((t) => teacherNeedles.includes(t));
+		})
 		: [];
 	const roomMatches = roomNeedle
 		? allEntries.filter((e) => normalize(e.room) === roomNeedle)

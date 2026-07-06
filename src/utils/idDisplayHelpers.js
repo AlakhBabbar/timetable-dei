@@ -84,13 +84,19 @@ export async function getTeacherDisplayName(teacherId) {
   if (!teacherId) return "";
   
   const teachers = await fetchTeachersCache();
-  const teacher = teachers.get(String(teacherId));
+  const ids = String(teacherId).split(',').map(id => id.trim()).filter(Boolean);
+  const names = [];
   
-  if (teacher) {
-    return teacher.ID || teacher.name || teacherId;
+  for (const id of ids) {
+    const teacher = teachers.get(String(id));
+    if (teacher) {
+      names.push(teacher.ID || teacher.name || id);
+    } else {
+      names.push(id);
+    }
   }
   
-  return teacherId;
+  return names.join(", ");
 }
 
 /**
@@ -101,15 +107,27 @@ export async function getTeacherIdFromDisplay(displayName) {
   if (!displayName) return null;
   
   const teachers = await fetchTeachersCache();
-  const trimmedName = displayName.trim();
+  const names = displayName.split(',').map(n => n.trim()).filter(Boolean);
+  const ids = [];
   
-  for (const [id, teacher] of teachers) {
-    if (teacher.ID && teacher.ID.trim() === trimmedName) {
-      return id;
+  for (const name of names) {
+    let foundId = null;
+    for (const [id, teacher] of teachers) {
+      if (teacher.ID && teacher.ID.trim() === name) {
+        foundId = id;
+        break;
+      }
+    }
+    if (foundId) {
+      ids.push(foundId);
+    } else {
+      // If a teacher name is typed but not matched yet, we can keep the name or ignore
+      // Returning null if any part is not resolved, so validation keeps it invalid
+      return null;
     }
   }
   
-  return null;
+  return ids.length > 0 ? ids.join(", ") : null;
 }
 
 /**
