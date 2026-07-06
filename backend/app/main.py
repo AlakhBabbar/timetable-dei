@@ -5,6 +5,9 @@ from app.auth import router as auth_router
 from app.rooms import router as rooms_router
 from app.teachers import router as teachers_router
 from app.courses import router as courses_router
+from app.schedules import router as schedules_router
+from app.timetables import router as timetables_router
+
 
 
 
@@ -27,6 +30,8 @@ app.include_router(auth_router)
 app.include_router(rooms_router)
 app.include_router(teachers_router)
 app.include_router(courses_router)
+app.include_router(schedules_router)
+app.include_router(timetables_router)
 
 
 @app.get("/api")

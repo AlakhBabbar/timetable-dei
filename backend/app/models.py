@@ -1,3 +1,4 @@
+from pydantic import ConfigDict
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
@@ -111,3 +112,52 @@ class CourseOut(BaseModel):
     faculty: str = ""
     department: str = ""
     semester: str = ""
+
+# ── Schedules ────────────────────────────────────────────────────────────
+class ScheduleItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    timetableId: str
+    tableId: str
+    rowIndex: int = 0
+    colIndex: int = 0
+    batchIndex: int = 0
+    day: str = ""
+    time: str = ""
+    class_: str = Field("", alias="class")
+    branch: str = ""
+    batch: str = ""
+    type: str = ""
+    courseId: str = ""
+    teacherId: str = ""   # NOTE: may be a comma-separated list of unids, kept as-is
+    roomId: str = ""
+    remark: Optional[str] = None
+
+
+class SaveSchedulesRequest(BaseModel):
+    timetableId: str
+    schedules: list[ScheduleItem] = []
+
+
+# ── Timetables ───────────────────────────────────────────────────────────
+class TimetableMetaIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = ""
+    class_: str = Field(..., alias="class")
+    branch: str
+    faculty: str = ""
+    department: str = ""
+    semester: str
+    type: str
+    days: list[str] = []
+    timeSlots: list[str] = []
+
+
+class SaveTimetableRequest(BaseModel):
+    meta: TimetableMetaIn
+    tables: list[str] = []
+    days: list[str] = []
+    timeSlots: list[str] = []
+    batchesByTable: dict = {}
+    batchDataByTable: dict = {}
