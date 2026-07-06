@@ -1,0 +1,79 @@
+from fastapi import APIRouter, HTTPException, Depends
+from datetime import datetime
+
+from app.models import TeacherCreate, TeacherOut
+from app.database import teachers_collection
+from app.dependencies import get_current_user, require_role
+
+router = APIRouter(prefix="/api/teachers", tags=["teachers"])
+
+
+def teacher_to_out(doc: dict) -> TeacherOut:
+    return TeacherOut(
+        unid=doc["unid"],
+        ID=doc.get("ID", ""),
+        name=doc["name"],
+        faculty=doc.get("faculty", ""),
+        department=doc.get("department", ""),
+    )
+
+
+@router.get("", response_model=list[TeacherOut])
+async def list_teachers(
+    faculty: str | None = None,
+    department: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    query = {}
+    if faculty:
+        query["faculty"] = {"$regex": f"^{faculty}$", "$options": "i"}
+    if department:
+        query["department"] = {"$regex": f"^{department}$", "$options": "i"}
+    teachers = await teachers_collection.find(query).to_list(length=None)
+    return [teacher_to_out(t) for t in teachers]
+
+
+@router.get("/faculties", response_model=list[str])
+async def list_faculties(user: dict = Depends(get_current_user)):
+    faculties = await teachers_collection.distinct("faculty")
+    return sorted(f for f in faculties if f)
+
+
+@router.get("/departments", response_model=list[str])
+async def list_departments(faculty: str, user: dict = Depends(get_current_user)):
+    departments = await teachers_collection.distinct("department", {"faculty": {"$regex": f"^{faculty}$", "$options": "i"}})
+    return sorted(d for d in departments if d)
+
+
+@router.post("", response_model=TeacherOut, status_code=201)
+async def upsert_teacher(
+    payload: TeacherCreate,
+    user: dict = Depends(require_role("admin", "tt_incharge")),
+):
+    unid = payload.unid or int(datetime.utcnow().timestamp() * 1000)
+
+    doc = {
+        "_id": unid,
+        "unid": unid,
+        "ID": payload.ID.strip(),
+        "name": payload.name.strip(),
+        "faculty": payload.faculty.strip(),
+        "department": payload.department.strip(),
+    }
+
+    existing = await teachers_collection.find_one({"_id": unid})
+    if existing:
+        update_fields = {k: v for k, v in doc.items() if k != "_id"}
+        await teachers_collection.update_one({"_id": unid}, {"$set": update_fields})
+    else:
+        await teachers_collection.insert_one(doc)
+
+    saved = await teachers_collection.find_one({"_id": unid})
+    return teacher_to_out(saved)
+
+
+@router.delete("/{unid}", status_code=204)
+async def delete_teacher(unid: int, user: dict = Depends(require_role("admin", "tt_incharge"))):
+    result = await teachers_collection.delete_one({"_id": unid})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Teacher not found")
