@@ -18,7 +18,7 @@ app = FastAPI(title="Planovate API")
 # what the university server's domain/port will be.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

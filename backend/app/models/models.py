@@ -57,7 +57,7 @@ class Availability(BaseModel):
     sat: DayAvailability = DayAvailability()
 
 class RoomCreate(BaseModel):
-    unid: Optional[int] = None   # if not given, we generate one
+    unid: Optional[str | int] = None   # if not given, we generate one
     ID: str = ""
     name: str
     capacity: int
@@ -66,7 +66,7 @@ class RoomCreate(BaseModel):
     availability: Optional[dict] = None  # {"day": {"mon": {"time": []}, ...}}
 
 class RoomOut(BaseModel):
-    unid: int
+    unid: str | int
     ID: str = ""
     name: str
     capacity: int
@@ -77,14 +77,14 @@ class RoomOut(BaseModel):
 
 # ── Teachers ─────────────────────────────────────────────────────────────
 class TeacherCreate(BaseModel):
-    unid: Optional[int] = None
+    unid: Optional[str | int] = None
     ID: str = ""
     name: str
     faculty: str = ""
     department: str = ""
 
 class TeacherOut(BaseModel):
-    unid: int
+    unid: str | int
     ID: str = ""
     name: str
     faculty: str = ""
@@ -92,23 +92,23 @@ class TeacherOut(BaseModel):
 
 # ── Courses ──────────────────────────────────────────────────────────────
 class CourseCreate(BaseModel):
-    unid: Optional[int] = None
+    unid: Optional[str | int] = None
     ID: str = ""
     name: str
     code: str = ""
     credits: str = ""
-    teachers: list[int] = []   # list of teacher unids
+    teachers: list[str | int] = []   # list of teacher unids
     faculty: str = ""
     department: str = ""
     semester: str = ""
 
 class CourseOut(BaseModel):
-    unid: int
+    unid: str | int
     ID: str = ""
     name: str
     code: str = ""
     credits: str = ""
-    teachers: list[int] = []
+    teachers: list[str | int] = []
     faculty: str = ""
     department: str = ""
     semester: str = ""

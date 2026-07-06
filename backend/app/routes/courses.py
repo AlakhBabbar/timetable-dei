@@ -85,21 +85,33 @@ async def upsert_course(
         "semester": payload.semester.strip(),
     }
 
-    existing = await courses_collection.find_one({"_id": unid})
+    existing = await courses_collection.find_one({
+        "$or": [{"_id": unid}, {"unid": unid}, {"unid": str(unid)}]
+    })
     if existing:
+        actual_id = existing["_id"]
         update_fields = {k: v for k, v in doc.items() if k != "_id"}
-        await courses_collection.update_one({"_id": unid}, {"$set": update_fields})
+        await courses_collection.update_one({"_id": actual_id}, {"$set": update_fields})
     else:
         await courses_collection.insert_one(doc)
 
-    saved = await courses_collection.find_one({"_id": unid})
+    saved = await courses_collection.find_one({
+        "$or": [{"_id": unid}, {"unid": unid}, {"unid": str(unid)}]
+    })
     course_label = saved.get("code") or saved.get("name")
     await log_action(user, "upsert_course", f"Course {course_label} updated/created")
     return course_to_out(saved)
 
-@router.delete("/{unid}", status_code=204)
-async def delete_course(unid: int, user: dict = Depends(require_role("admin", "tt_incharge"))):
-    result = await courses_collection.delete_one({"_id": unid})
+@router.delete("/{unid_str}", status_code=204)
+async def delete_course(unid_str: str, user: dict = Depends(require_role("admin", "tt_incharge"))):
+    try:
+        unid = int(unid_str)
+    except ValueError:
+        unid = unid_str
+        
+    result = await courses_collection.delete_many({
+        "$or": [{"_id": unid}, {"unid": unid}, {"unid": str(unid)}]
+    })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Course not found")
     await log_action(user, "delete_course", f"Course ID {unid} deleted")

@@ -19,7 +19,12 @@ router = APIRouter(prefix="/api/timetables", tags=["timetables"])
 
 
 def _strip_id(doc: dict) -> dict:
-    doc.pop("_id", None)
+    doc_id = doc.pop("_id", None)
+    if doc_id:
+        if "timetableId" not in doc:
+            doc["timetableId"] = str(doc_id)
+        if "unid" not in doc:
+            doc["unid"] = str(doc_id)
     return doc
 
 
@@ -59,7 +64,9 @@ async def list_all_timetables_meta(user: dict = Depends(get_current_user)):
 
 @router.get("/{timetable_id}")
 async def load_timetable(timetable_id: str, user: dict = Depends(get_current_user)):
-    meta = await timetables_collection.find_one({"_id": timetable_id})
+    meta = await timetables_collection.find_one({
+        "$or": [{"_id": timetable_id}, {"timetableId": timetable_id}, {"unid": timetable_id}]
+    })
     if meta is None:
         return None
     meta = _strip_id(meta)
@@ -81,7 +88,9 @@ async def load_timetable(timetable_id: str, user: dict = Depends(get_current_use
 @router.post("/preset", status_code=201)
 async def create_timetable_preset(meta: TimetableMetaIn, user: dict = Depends(require_role("admin", "tt_incharge"))):
     timetable_id = generate_timetable_id(meta.class_, meta.branch, meta.semester, meta.type)
-    if await timetables_collection.find_one({"_id": timetable_id}):
+    if await timetables_collection.find_one({
+        "$or": [{"_id": timetable_id}, {"timetableId": timetable_id}, {"unid": timetable_id}]
+    }):
         raise HTTPException(
             status_code=409,
             detail=f"A timetable for {meta.class_} / {meta.branch} / Sem {meta.semester} / {meta.type} already exists.",
@@ -134,19 +143,26 @@ async def update_timetable_meta(
     }
 
     if old_timetable_id == new_timetable_id:
-        await timetables_collection.update_one({"_id": new_timetable_id}, {"$set": payload})
+        await timetables_collection.update_one(
+            {"$or": [{"_id": new_timetable_id}, {"timetableId": new_timetable_id}, {"unid": new_timetable_id}]}, 
+            {"$set": payload}
+        )
     else:
-        old_doc = await timetables_collection.find_one({"_id": old_timetable_id}) or {}
-        old_doc.pop("_id", None)
+        old_doc = await timetables_collection.find_one({
+            "$or": [{"_id": old_timetable_id}, {"timetableId": old_timetable_id}, {"unid": old_timetable_id}]
+        }) or {}
+        actual_old_id = old_doc.pop("_id", old_timetable_id)
         merged = {**old_doc, **payload, "_id": new_timetable_id}
         await timetables_collection.insert_one(merged)
-        await timetables_collection.delete_one({"_id": old_timetable_id})
+        await timetables_collection.delete_one({"_id": actual_old_id})
         # Matching original behavior exactly: existing schedules still carry
         # old_timetable_id and are NOT moved to the new id. That's a real gap
         # in the current Firebase app too (renaming orphans schedules) —
         # preserving it rather than fixing it, per scope.
 
-    saved = await timetables_collection.find_one({"_id": new_timetable_id})
+    saved = await timetables_collection.find_one({
+        "$or": [{"_id": new_timetable_id}, {"timetableId": new_timetable_id}, {"unid": new_timetable_id}]
+    })
     await log_action(user, "update_timetable_meta", f"Timetable metadata updated: {new_timetable_id}")
     return _strip_id(saved)
 
@@ -161,8 +177,8 @@ async def save_timetable(payload: SaveTimetableRequest, user: dict = Depends(req
     now = datetime.now(timezone.utc)
 
     await timetables_collection.update_one(
-        {"_id": timetable_id},
-        {"$set": {**prepared, "updatedAt": now}, "$setOnInsert": {"createdAt": now}},
+        {"$or": [{"_id": timetable_id}, {"timetableId": timetable_id}, {"unid": timetable_id}]},
+        {"$set": {**prepared, "updatedAt": now}, "$setOnInsert": {"createdAt": now, "_id": timetable_id}},
         upsert=True,
     )
 
@@ -193,7 +209,9 @@ async def save_timetable(payload: SaveTimetableRequest, user: dict = Depends(req
     if orphaned:
         await schedules_collection.delete_many({"_id": {"$in": list(orphaned)}})
 
-    saved_meta = await timetables_collection.find_one({"_id": timetable_id})
+    saved_meta = await timetables_collection.find_one({
+        "$or": [{"_id": timetable_id}, {"timetableId": timetable_id}, {"unid": timetable_id}]
+    })
     await log_action(user, "save_timetable", f"Timetable {timetable_id} saved/updated")
     return {
         "timetableId": timetable_id,
@@ -206,7 +224,9 @@ async def save_timetable(payload: SaveTimetableRequest, user: dict = Depends(req
 @router.delete("/{timetable_id}", status_code=204)
 async def delete_timetable(timetable_id: str, user: dict = Depends(require_role("admin", "tt_incharge"))):
     await schedules_collection.delete_many({"timetableId": timetable_id})
-    result = await timetables_collection.delete_one({"_id": timetable_id})
+    result = await timetables_collection.delete_many({
+        "$or": [{"_id": timetable_id}, {"timetableId": timetable_id}, {"unid": timetable_id}]
+    })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Timetable not found")
     await log_action(user, "delete_timetable", f"Timetable {timetable_id} deleted")

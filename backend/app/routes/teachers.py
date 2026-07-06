@@ -62,21 +62,33 @@ async def upsert_teacher(
         "department": payload.department.strip(),
     }
 
-    existing = await teachers_collection.find_one({"_id": unid})
+    existing = await teachers_collection.find_one({
+        "$or": [{"_id": unid}, {"unid": unid}, {"unid": str(unid)}]
+    })
     if existing:
+        actual_id = existing["_id"]
         update_fields = {k: v for k, v in doc.items() if k != "_id"}
-        await teachers_collection.update_one({"_id": unid}, {"$set": update_fields})
+        await teachers_collection.update_one({"_id": actual_id}, {"$set": update_fields})
     else:
         await teachers_collection.insert_one(doc)
 
-    saved = await teachers_collection.find_one({"_id": unid})
+    saved = await teachers_collection.find_one({
+        "$or": [{"_id": unid}, {"unid": unid}, {"unid": str(unid)}]
+    })
     await log_action(user, "upsert_teacher", f"Teacher {saved['name']} updated/created")
     return teacher_to_out(saved)
 
 
-@router.delete("/{unid}", status_code=204)
-async def delete_teacher(unid: int, user: dict = Depends(require_role("admin", "tt_incharge"))):
-    result = await teachers_collection.delete_one({"_id": unid})
+@router.delete("/{unid_str}", status_code=204)
+async def delete_teacher(unid_str: str, user: dict = Depends(require_role("admin", "tt_incharge"))):
+    try:
+        unid = int(unid_str)
+    except ValueError:
+        unid = unid_str
+        
+    result = await teachers_collection.delete_many({
+        "$or": [{"_id": unid}, {"unid": unid}, {"unid": str(unid)}]
+    })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Teacher not found")
     await log_action(user, "delete_teacher", f"Teacher ID {unid} deleted")

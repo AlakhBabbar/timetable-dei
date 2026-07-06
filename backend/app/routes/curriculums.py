@@ -17,7 +17,9 @@ def generate_curriculum_id(class_name: str, branch: str, semester: str, type_: s
 
 
 def _strip_id(doc: dict) -> dict:
-    doc.pop("_id", None)
+    doc_id = doc.pop("_id", None)
+    if doc_id and "curriculumId" not in doc:
+        doc["curriculumId"] = str(doc_id)
     return doc
 
 
@@ -29,7 +31,9 @@ async def list_curriculums(user: dict = Depends(get_current_user)):
 
 @router.get("/{curriculum_id}")
 async def get_curriculum(curriculum_id: str, user: dict = Depends(get_current_user)):
-    doc = await curriculums_collection.find_one({"_id": curriculum_id})
+    doc = await curriculums_collection.find_one({
+        "$or": [{"_id": curriculum_id}, {"curriculumId": curriculum_id}, {"unid": curriculum_id}]
+    })
     if doc is None:
         return None
     return _strip_id(doc)
@@ -51,16 +55,24 @@ async def save_curriculum(payload: CurriculumIn, user: dict = Depends(require_ro
         "createdAt": now,  # NOTE: reset on every save, matches original setDoc(merge:true) behavior exactly
     }
 
-    await curriculums_collection.update_one({"_id": curriculum_id}, {"$set": doc}, upsert=True)
+    await curriculums_collection.update_one(
+        {"$or": [{"_id": curriculum_id}, {"curriculumId": curriculum_id}, {"unid": curriculum_id}]}, 
+        {"$set": doc}, 
+        upsert=True
+    )
 
-    saved = await curriculums_collection.find_one({"_id": curriculum_id})
+    saved = await curriculums_collection.find_one({
+        "$or": [{"_id": curriculum_id}, {"curriculumId": curriculum_id}, {"unid": curriculum_id}]
+    })
     await log_action(user, "save_curriculum", f"Curriculum {curriculum_id} saved")
     return _strip_id(saved)
 
 
 @router.delete("/{curriculum_id}", status_code=204)
 async def delete_curriculum(curriculum_id: str, user: dict = Depends(require_role("admin", "tt_incharge"))):
-    result = await curriculums_collection.delete_one({"_id": curriculum_id})
+    result = await curriculums_collection.delete_many({
+        "$or": [{"_id": curriculum_id}, {"curriculumId": curriculum_id}, {"unid": curriculum_id}]
+    })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Curriculum not found")
     await log_action(user, "delete_curriculum", f"Curriculum {curriculum_id} deleted")

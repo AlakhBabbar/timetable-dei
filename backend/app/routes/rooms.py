@@ -61,22 +61,33 @@ async def upsert_room(
         "availability": payload.availability or DEFAULT_AVAILABILITY,
     }
 
-    existing = await rooms_collection.find_one({"_id": unid})
+    existing = await rooms_collection.find_one({
+        "$or": [{"_id": unid}, {"unid": unid}, {"unid": str(unid)}]
+    })
     if existing:
-        # can't touch _id on update, so exclude it from the $set
+        actual_id = existing["_id"]
         update_fields = {k: v for k, v in doc.items() if k != "_id"}
-        await rooms_collection.update_one({"_id": unid}, {"$set": update_fields})
+        await rooms_collection.update_one({"_id": actual_id}, {"$set": update_fields})
     else:
         await rooms_collection.insert_one(doc)
 
-    saved = await rooms_collection.find_one({"_id": unid})
+    saved = await rooms_collection.find_one({
+        "$or": [{"_id": unid}, {"unid": unid}, {"unid": str(unid)}]
+    })
     await log_action(user, "upsert_room", f"Room {saved['name']} updated/created")
     return room_to_out(saved)
 
 
-@router.delete("/{unid}", status_code=204)
-async def delete_room(unid: int, user: dict = Depends(require_role("admin", "tt_incharge"))):
-    result = await rooms_collection.delete_one({"_id": unid})
+@router.delete("/{unid_str}", status_code=204)
+async def delete_room(unid_str: str, user: dict = Depends(require_role("admin", "tt_incharge"))):
+    try:
+        unid = int(unid_str)
+    except ValueError:
+        unid = unid_str
+        
+    result = await rooms_collection.delete_many({
+        "$or": [{"_id": unid}, {"unid": unid}, {"unid": str(unid)}]
+    })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Room not found")
     await log_action(user, "delete_room", f"Room ID {unid} deleted")
