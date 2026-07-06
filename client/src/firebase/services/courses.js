@@ -1,17 +1,4 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  query,
-  setDoc,
-  where,
-} from "firebase/firestore";
-
-import { db } from "../firebaseConfig";
-import { logAction } from "./auditLogs";
-
-const coursesCol = collection(db, "courses");
+import { apiFetch } from "../api";
 
 const normalize = (value) =>
   String(value ?? "")
@@ -47,9 +34,10 @@ export async function listCourses({ faculty, department, semester } = {}, forceR
     return result;
   }
   
-  const snap = await getDocs(coursesCol);
-  cachedCourses = snap.docs.map((d) => ({ ...d.data(), unid: Number(d.id) || d.data().unid }));
-  lastCoursesFetch = now;
+  // Fetch ALL courses for caching
+  const allCourses = await apiFetch("/api/courses");
+  cachedCourses = allCourses;
+  lastCoursesFetch = Date.now();
   
   let result = cachedCourses;
   if (faculty) {
@@ -82,15 +70,16 @@ export async function upsertCourse(course) {
     semester: normalize(course.semester),
   };
 
-  await setDoc(doc(coursesCol, String(unid)), payload, { merge: true });
-  await logAction("upsert_course", `Course ${payload.code || payload.name} updated/created`);
+  await apiFetch("/api/courses", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
   return unid;
 }
 
 export async function deleteCourse(unid) {
   clearCoursesCache();
-  await deleteDoc(doc(coursesCol, String(unid)));
-  await logAction("delete_course", `Course ID ${unid} deleted`);
+  await apiFetch(`/api/courses/${unid}`, { method: "DELETE" });
 }
 
 export async function listDepartments(faculty, forceRefresh = false) {

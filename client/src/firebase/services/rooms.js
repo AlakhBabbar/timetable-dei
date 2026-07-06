@@ -1,17 +1,4 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  query,
-  setDoc,
-  where,
-} from "firebase/firestore";
-
-import { db } from "../firebaseConfig";
-import { logAction } from "./auditLogs";
-
-const roomsCol = collection(db, "rooms");
+import { apiFetch } from "../api";
 
 const normalize = (value) =>
   String(value ?? "")
@@ -38,9 +25,10 @@ export async function listRooms({ faculty } = {}, forceRefresh = false) {
     return cachedRooms;
   }
   
-  const snap = await getDocs(roomsCol);
-  cachedRooms = snap.docs.map((d) => ({ ...d.data(), unid: Number(d.id) || d.data().unid }));
-  lastRoomsFetch = now;
+  // Fetch ALL rooms for caching
+  const allRooms = await apiFetch("/api/rooms");
+  cachedRooms = allRooms;
+  lastRoomsFetch = Date.now();
   
   if (faculty) {
     const normalizedFaculty = normalize(faculty).toLowerCase();
@@ -71,15 +59,16 @@ export async function upsertRoom(room) {
     },
   };
 
-  await setDoc(doc(roomsCol, String(unid)), payload, { merge: true });
-  await logAction("upsert_room", `Room ${payload.name} updated/created`);
+  await apiFetch("/api/rooms", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
   return unid;
 }
 
 export async function deleteRoom(unid) {
   clearRoomsCache();
-  await deleteDoc(doc(roomsCol, String(unid)));
-  await logAction("delete_room", `Room ID ${unid} deleted`);
+  await apiFetch(`/api/rooms/${unid}`, { method: "DELETE" });
 }
 
 export async function listFaculties(forceRefresh = false) {

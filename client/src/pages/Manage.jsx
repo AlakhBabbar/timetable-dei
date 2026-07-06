@@ -5,8 +5,7 @@ import Footer from "../components/Footer";
 import { timetableService, settingsService, curriculumService, scheduleService } from "../firebase/services";
 import { backupCompleteDatabase, getBackupSummary, restoreFromBackup } from "../utils/databaseBackup";
 import CurriculumFilling from "./CurriculumFilling";
-import { doc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../firebase/firebaseConfig";
+
 
 const Manage = () => {
   const [activeTab, setActiveTab] = useState("timetables");

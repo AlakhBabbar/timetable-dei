@@ -1,13 +1,5 @@
 import { create } from "zustand";
-import { 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged,
-  sendPasswordResetEmail,
-  createUserWithEmailAndPassword
-} from "firebase/auth";
-import { auth, db } from "../firebase/firebaseConfig";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { apiFetch } from "../firebase/api";
 
 export const useAuthStore = create((set) => ({
   user: null,
@@ -16,47 +8,43 @@ export const useAuthStore = create((set) => ({
   error: null,
   
   initializeAuth: () => {
-    return onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const docRef = doc(db, "users", user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            set({ user, role: docSnap.data().role || "admin", loading: false });
-          } else {
-            // Default to admin for existing users
-            set({ user, role: "admin", loading: false });
-          }
-        } catch (error) {
-          console.error("Error fetching user role:", error);
-          set({ user, role: "admin", loading: false });
-        }
-      } else {
+    // Check localStorage for existing session
+    const token = localStorage.getItem("access_token");
+    const storedUser = localStorage.getItem("user_data");
+
+    if (token && storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        set({ user: userData, role: userData.role || "admin", loading: false });
+      } catch {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user_data");
         set({ user: null, role: null, loading: false });
       }
-    });
+    } else {
+      set({ user: null, role: null, loading: false });
+    }
+
+    // Return a no-op unsubscribe to match Firebase onAuthStateChanged interface
+    return () => {};
   },
 
   login: async (email, password) => {
     set({ loading: true, error: null });
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-      let role = "admin";
-      if (docSnap.exists()) {
-        role = docSnap.data().role || "admin";
-      }
-      
-      set({ user, role, loading: false });
+      const data = await apiFetch("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+
+      const { access_token, user } = data;
+      localStorage.setItem("access_token", access_token);
+      localStorage.setItem("user_data", JSON.stringify(user));
+
+      set({ user, role: user.role || "admin", loading: false });
       return user;
     } catch (error) {
-      let errorMessage = "Failed to log in.";
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        errorMessage = "Invalid email or password.";
-      }
+      const errorMessage = error.message || "Failed to log in.";
       set({ error: errorMessage, loading: false });
       throw new Error(errorMessage);
     }
@@ -65,27 +53,24 @@ export const useAuthStore = create((set) => ({
   signUpTeacher: async (email, password) => {
     set({ loading: true, error: null });
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      const docRef = doc(db, "users", user.uid);
-      await setDoc(docRef, {
-        email,
-        role: "teacher",
-        createdAt: new Date().toISOString()
+      const data = await apiFetch("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          email,
+          password,
+          name: email.split("@")[0],
+          role: "teacher",
+        }),
       });
-      
+
+      const { access_token, user } = data;
+      localStorage.setItem("access_token", access_token);
+      localStorage.setItem("user_data", JSON.stringify(user));
+
       set({ user, role: "teacher", loading: false });
       return user;
     } catch (error) {
-      let errorMessage = "Failed to sign up.";
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "This email is already registered.";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = "Password should be at least 6 characters.";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "Invalid email format.";
-      }
+      const errorMessage = error.message || "Failed to sign up.";
       set({ error: errorMessage, loading: false });
       throw new Error(errorMessage);
     }
@@ -94,27 +79,28 @@ export const useAuthStore = create((set) => ({
   logout: async () => {
     set({ loading: true });
     try {
-      await signOut(auth);
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("user_data");
       set({ user: null, role: null, loading: false });
     } catch (error) {
       set({ error: error.message, loading: false });
     }
   },
 
-  resetPassword: async (email) => {
-    set({ loading: true, error: null });
-    try {
-      await sendPasswordResetEmail(auth, email);
-      set({ loading: false });
-    } catch (error) {
-      let errorMessage = "Failed to send password reset email.";
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = "You're not allowed. User email is not in the auth list.";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "Invalid email format.";
-      }
-      set({ error: errorMessage, loading: false });
-      throw new Error(errorMessage);
-    }
-  },
+  // Password reset is not supported by the local backend yet.
+  // Uncomment and implement when a backend route is added.
+  // resetPassword: async (email) => {
+  //   set({ loading: true, error: null });
+  //   try {
+  //     await apiFetch("/api/auth/reset-password", {
+  //       method: "POST",
+  //       body: JSON.stringify({ email }),
+  //     });
+  //     set({ loading: false });
+  //   } catch (error) {
+  //     const errorMessage = error.message || "Failed to send password reset email.";
+  //     set({ error: errorMessage, loading: false });
+  //     throw new Error(errorMessage);
+  //   }
+  // },
 }));

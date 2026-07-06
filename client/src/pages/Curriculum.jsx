@@ -3,8 +3,6 @@ import { Plus, X, List, Grid, Save, Trash2, Search, BookOpen, Users } from "luci
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { courseService, teacherService, curriculumService } from "../firebase/services";
-import { collection, doc, setDoc, getDocs, deleteDoc } from "firebase/firestore";
-import { db } from "../firebase/firebaseConfig";
 
 const Curriculum = () => {
   const [viewMode, setViewMode] = useState("cards");

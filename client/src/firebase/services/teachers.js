@@ -1,17 +1,4 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  query,
-  setDoc,
-  where,
-} from "firebase/firestore";
-
-import { db } from "../firebaseConfig";
-import { logAction } from "./auditLogs";
-
-const teachersCol = collection(db, "teachers");
+import { apiFetch } from "../api";
 
 const normalize = (value) =>
   String(value ?? "")
@@ -43,10 +30,16 @@ export async function listTeachers({ faculty, department } = {}, forceRefresh = 
     return result;
   }
   
-  const snap = await getDocs(teachersCol);
-  cachedTeachers = snap.docs.map((d) => ({ ...d.data(), unid: Number(d.id) || d.data().unid }));
-  lastTeachersFetch = now;
-  
+  const params = new URLSearchParams();
+  if (faculty) params.append("faculty", faculty);
+  if (department) params.append("department", department);
+  const qs = params.toString();
+
+  // When caching, fetch ALL teachers (no filters) so cache is complete
+  const allTeachers = await apiFetch("/api/teachers");
+  cachedTeachers = allTeachers;
+  lastTeachersFetch = Date.now();
+
   let result = cachedTeachers;
   if (faculty) {
     const normFaculty = normalize(faculty).toLowerCase();
@@ -70,15 +63,16 @@ export async function upsertTeacher(teacher) {
     department: normalize(teacher.department),
   };
 
-  await setDoc(doc(teachersCol, String(unid)), payload, { merge: true });
-  await logAction("upsert_teacher", `Teacher ${payload.name} updated/created`);
+  await apiFetch("/api/teachers", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
   return unid;
 }
 
 export async function deleteTeacher(unid) {
   clearTeachersCache();
-  await deleteDoc(doc(teachersCol, String(unid)));
-  await logAction("delete_teacher", `Teacher ID ${unid} deleted`);
+  await apiFetch(`/api/teachers/${unid}`, { method: "DELETE" });
 }
 
 export async function listFaculties(forceRefresh = false) {

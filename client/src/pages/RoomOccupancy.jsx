@@ -8,8 +8,6 @@ import { getAllSchedules } from "../firebase/services/schedules";
 import { DEFAULT_TIME_SLOTS } from "../utils/timetableUIHelpers";
 import { getCourseDisplayName, getTeacherDisplayName } from "../utils/idDisplayHelpers";
 import { exportRoomOccupancyToPdf, exportRoomOccupancyToExcel, exportRoomOccupancyToPdfMobile, exportRoomOccupancyToExcelMobile } from "../utils/roomOccupancyExport";
-import { db } from "../firebase/firebaseConfig";
-import { collection, getDocs, query, where } from "firebase/firestore";
 
 const RoomOccupancy = () => {
   const [rooms, setRooms] = useState([]);
@@ -155,9 +153,8 @@ const RoomOccupancy = () => {
     setSchedules([]);
 
     try {
-      const schedulesCol = collection(db, "schedules");
-      const snap = await getDocs(query(schedulesCol, where("roomId", "==", String(room.unid))));
-      const roomSchedules = snap.docs.map((d) => d.data());
+      const allSchedules = await getAllSchedules();
+      const roomSchedules = allSchedules.filter((s) => String(s.roomId) === String(room.unid));
 
       const resolved = await resolveSchedulesList(roomSchedules);
       setSchedules(resolved);

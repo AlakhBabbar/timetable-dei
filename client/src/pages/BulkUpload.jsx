@@ -3,8 +3,6 @@ import { Upload, Download, CheckCircle, XCircle, AlertCircle } from "lucide-reac
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { courseService, roomService, teacherService } from "../firebase/services";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../firebase/firebaseConfig";
 
 const BulkUpload = () => {
   const [activeTab, setActiveTab] = useState("teachers");
@@ -16,40 +14,36 @@ const BulkUpload = () => {
 
   // Check for duplicate teacher with name comparison
   const checkTeacherConflict = async (teacherID, teacherName) => {
-    const q = query(collection(db, "teachers"), where("ID", "==", teacherID));
-    const snapshot = await getDocs(q);
+    const allTeachers = await teacherService.listTeachers({});
+    const existing = allTeachers.find(t => t.ID === teacherID);
     
-    if (snapshot.empty) {
+    if (!existing) {
       return { exists: false };
     }
     
-    const existingTeacher = snapshot.docs[0].data();
-    const isSameName = normalize(existingTeacher.name) === normalize(teacherName);
+    const isSameName = normalize(existing.name) === normalize(teacherName);
     
     return {
       exists: true,
       sameName: isSameName,
-      existingName: existingTeacher.name
+      existingName: existing.name
     };
   };
 
   // Check for duplicates
   const checkDuplicateTeacher = async (teacherID) => {
-    const q = query(collection(db, "teachers"), where("ID", "==", teacherID));
-    const snapshot = await getDocs(q);
-    return !snapshot.empty;
+    const allTeachers = await teacherService.listTeachers({});
+    return allTeachers.some(t => t.ID === teacherID);
   };
 
   const checkDuplicateCourse = async (courseID) => {
-    const q = query(collection(db, "courses"), where("ID", "==", courseID));
-    const snapshot = await getDocs(q);
-    return snapshot.empty ? null : snapshot.docs[0].data();
+    const allCourses = await courseService.listCourses({});
+    return allCourses.find(c => c.ID === courseID) || null;
   };
 
   const checkDuplicateRoom = async (roomID) => {
-    const q = query(collection(db, "rooms"), where("ID", "==", roomID));
-    const snapshot = await getDocs(q);
-    return !snapshot.empty;
+    const allRooms = await roomService.listRooms({});
+    return allRooms.some(r => r.ID === roomID);
   };
 
   // Normalize string for comparison

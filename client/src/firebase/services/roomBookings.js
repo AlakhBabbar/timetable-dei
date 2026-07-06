@@ -4,14 +4,8 @@
  * Used to prevent double-booking of rooms at the same day+time.
  */
 
-import {
-  collection,
-  getDocs,
-} from "firebase/firestore";
+import { apiFetch } from "../api";
 
-import { db } from "../firebaseConfig";
-
-const schedulesCol = collection(db, "schedules");
 const DEFAULT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const normalize = (value) =>
@@ -29,11 +23,10 @@ const getBatchCount = (batchesForTable, rowIndex, colIndex) => {
  * Returns a map: roomId -> [{ day, time, timetableId, class, branch, semester, type }]
  */
 export async function getAllRoomBookings() {
-  const snap = await getDocs(schedulesCol);
+  const allSchedules = await apiFetch("/api/schedules/all");
   const bookingsMap = {};
 
-  snap.docs.forEach((d) => {
-    const data = d.data();
+  (allSchedules || []).forEach((data) => {
     const roomId = data.roomId;
     if (!roomId) return; // Skip entries without a room
 

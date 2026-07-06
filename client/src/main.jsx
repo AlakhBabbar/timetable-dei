@@ -15,7 +15,7 @@ import TeacherOccupancy from "./pages/TeacherOccupancy";
 import ClassOccupancy from "./pages/ClassOccupancy";
 import AdminSettings from "./pages/AdminSettings";
 import ManageAllCourses from "./pages/ManageAllCourses";
-import DataMigration from "./temp/DataMigration";
+// import DataMigration from "./temp/DataMigration";
 import Login from "./pages/Login";
 import AuditLogs from "./pages/AuditLogs";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -33,7 +33,7 @@ const AppRoutes = () => {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
-        
+
         {/* Protected Routes */}
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/teacher-load" element={<ProtectedRoute><TeacherLoad /></ProtectedRoute>} />
@@ -49,7 +49,7 @@ const AppRoutes = () => {
         <Route path="/manage-all-courses" element={<ProtectedRoute><ManageAllCourses /></ProtectedRoute>} />
         <Route path="/bulk-upload" element={<ProtectedRoute><BulkUpload /></ProtectedRoute>} />
         <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
-        <Route path="/data-migration" element={<ProtectedRoute><DataMigration /></ProtectedRoute>} />
+        {/* <Route path="/data-migration" element={<ProtectedRoute><DataMigration /></ProtectedRoute>} /> */}
       </Routes>
     </Router>
   );

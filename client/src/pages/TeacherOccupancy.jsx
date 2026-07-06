@@ -13,8 +13,6 @@ import {
   exportIndividualTeacherOccupancyToPdf,
   exportIndividualTeacherOccupancyToExcel
 } from "../utils/teacherOccupancyExport";
-import { db } from "../firebase/firebaseConfig";
-import { collection, getDocs, query, where } from "firebase/firestore";
 import { useAuthStore } from "../store/authStore";
 
 const TeacherOccupancy = () => {

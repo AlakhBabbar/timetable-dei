@@ -4,14 +4,8 @@
  * Used to prevent double-booking of teachers at the same day+time.
  */
 
-import {
-  collection,
-  getDocs,
-} from "firebase/firestore";
+import { apiFetch } from "../api";
 
-import { db } from "../firebaseConfig";
-
-const schedulesCol = collection(db, "schedules");
 const DEFAULT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const normalize = (value) =>
@@ -29,11 +23,10 @@ const getBatchCount = (batchesForTable, rowIndex, colIndex) => {
  * Returns a map: teacherId -> [{ day, time, timetableId, class, branch, semester, type }]
  */
 export async function getAllTeacherBookings() {
-  const snap = await getDocs(schedulesCol);
+  const allSchedules = await apiFetch("/api/schedules/all");
   const bookingsMap = {};
 
-  snap.docs.forEach((d) => {
-    const data = d.data();
+  (allSchedules || []).forEach((data) => {
     const teacherIdStr = data.teacherId;
     if (!teacherIdStr) return; // Skip entries without a teacher
 

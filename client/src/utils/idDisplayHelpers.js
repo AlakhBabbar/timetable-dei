@@ -19,6 +19,13 @@ const cache = {
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+// Promise locks to prevent multiple concurrent fetches
+const activeFetches = {
+  teachers: null,
+  courses: null,
+  rooms: null
+};
+
 /**
  * Fetch all teachers and cache them
  */
@@ -28,14 +35,25 @@ export async function fetchTeachersCache() {
     return cache.teachers;
   }
   
-  const teachers = await teacherService.listTeachers({});
-  cache.teachers.clear();
-  teachers.forEach(t => {
-    cache.teachers.set(String(t.unid), t);
-  });
-  cache.lastFetch.teachers = now;
+  if (activeFetches.teachers) {
+    return activeFetches.teachers;
+  }
   
-  return cache.teachers;
+  activeFetches.teachers = (async () => {
+    try {
+      const teachers = await teacherService.listTeachers({});
+      cache.teachers.clear();
+      teachers.forEach(t => {
+        cache.teachers.set(String(t.unid), t);
+      });
+      cache.lastFetch.teachers = Date.now();
+      return cache.teachers;
+    } finally {
+      activeFetches.teachers = null;
+    }
+  })();
+  
+  return activeFetches.teachers;
 }
 
 /**
@@ -47,14 +65,25 @@ export async function fetchCoursesCache() {
     return cache.courses;
   }
   
-  const courses = await courseService.listCourses({});
-  cache.courses.clear();
-  courses.forEach(c => {
-    cache.courses.set(String(c.unid), c);
-  });
-  cache.lastFetch.courses = now;
+  if (activeFetches.courses) {
+    return activeFetches.courses;
+  }
   
-  return cache.courses;
+  activeFetches.courses = (async () => {
+    try {
+      const courses = await courseService.listCourses({});
+      cache.courses.clear();
+      courses.forEach(c => {
+        cache.courses.set(String(c.unid), c);
+      });
+      cache.lastFetch.courses = Date.now();
+      return cache.courses;
+    } finally {
+      activeFetches.courses = null;
+    }
+  })();
+  
+  return activeFetches.courses;
 }
 
 /**
@@ -66,14 +95,25 @@ export async function fetchRoomsCache() {
     return cache.rooms;
   }
   
-  const rooms = await roomService.listRooms({});
-  cache.rooms.clear();
-  rooms.forEach(r => {
-    cache.rooms.set(String(r.unid), r);
-  });
-  cache.lastFetch.rooms = now;
+  if (activeFetches.rooms) {
+    return activeFetches.rooms;
+  }
   
-  return cache.rooms;
+  activeFetches.rooms = (async () => {
+    try {
+      const rooms = await roomService.listRooms({});
+      cache.rooms.clear();
+      rooms.forEach(r => {
+        cache.rooms.set(String(r.unid), r);
+      });
+      cache.lastFetch.rooms = Date.now();
+      return cache.rooms;
+    } finally {
+      activeFetches.rooms = null;
+    }
+  })();
+  
+  return activeFetches.rooms;
 }
 
 /**

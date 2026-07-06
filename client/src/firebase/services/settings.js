@@ -1,61 +1,31 @@
 /**
- * Firebase Firestore operations for admin settings
+ * Settings service — backed by local FastAPI backend
  */
 
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-
-import { db } from "../firebaseConfig";
-import { normalize } from "../../utils/dataHelpers";
-import { logAction } from "./auditLogs";
-
-const settingsCol = collection(db, "settings");
+import { apiFetch } from "../api";
 
 /**
  * Get all programs (class names like B.Tech, M.Tech)
  */
 export async function getPrograms() {
-  const docRef = doc(settingsCol, "programs");
-  const snap = await getDoc(docRef);
-  
-  if (!snap.exists()) {
-    return [];
-  }
-  
-  return snap.data().list || [];
+  return await apiFetch("/api/settings/programs");
 }
 
 /**
  * Save programs list
  */
 export async function savePrograms(programs) {
-  const docRef = doc(settingsCol, "programs");
-  await setDoc(docRef, {
-    list: programs,
-    updatedAt: serverTimestamp(),
+  await apiFetch("/api/settings/programs", {
+    method: "POST",
+    body: JSON.stringify({ programs }),
   });
-  await logAction("update_settings", "Programs list updated");
 }
 
 /**
  * Get all branches with their associated programs
  */
 export async function getBranches() {
-  const docRef = doc(settingsCol, "branches");
-  const snap = await getDoc(docRef);
-  
-  if (!snap.exists()) {
-    return [];
-  }
-  
-  return snap.data().list || [];
+  return await apiFetch("/api/settings/branches");
 }
 
 /**
@@ -63,25 +33,15 @@ export async function getBranches() {
  * Each branch has: { name, programs: [] }
  */
 export async function saveBranches(branches) {
-  const docRef = doc(settingsCol, "branches");
-  await setDoc(docRef, {
-    list: branches,
-    updatedAt: serverTimestamp(),
+  await apiFetch("/api/settings/branches", {
+    method: "POST",
+    body: JSON.stringify({ branches }),
   });
-  await logAction("update_settings", "Branches list updated");
 }
 
 /**
  * Get all settings at once
  */
 export async function getAllSettings() {
-  const [programs, branches] = await Promise.all([
-    getPrograms(),
-    getBranches(),
-  ]);
-  
-  return {
-    programs,
-    branches,
-  };
+  return await apiFetch("/api/settings/all");
 }

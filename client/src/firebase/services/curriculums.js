@@ -1,24 +1,9 @@
 /**
- * Firebase Firestore operations for curriculums
+ * Curriculum service — backed by local FastAPI backend
  */
 
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  setDoc,
-  where,
-} from "firebase/firestore";
-
-import { db } from "../firebaseConfig";
+import { apiFetch } from "../api";
 import { normalize } from "../../utils/dataHelpers";
-import { logAction } from "./auditLogs";
-
-const curriculumsCol = collection(db, "curriculums");
 
 /**
  * Generate curriculum ID from class, branch, semester, and type
@@ -37,53 +22,42 @@ export async function saveCurriculum(curriculumData) {
     throw new Error("Missing required fields: className, branch, semester, type");
   }
 
-  const curriculumId = generateCurriculumId({ className, branch, semester, type });
-
   const payload = {
-    curriculumId,
-    class: normalize(className),
-    branch: normalize(branch),
-    semester: normalize(semester),
-    type: normalize(type),
+    className,
+    branch,
+    semester,
+    type,
     courses: courses || [],
-    updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
   };
 
-  const curriculumRef = doc(curriculumsCol, curriculumId);
-  await setDoc(curriculumRef, payload, { merge: true });
+  const result = await apiFetch("/api/curriculums", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
-  await logAction("save_curriculum", `Curriculum ${curriculumId} saved`);
-
-  return curriculumId;
+  return result.curriculumId || generateCurriculumId({ className, branch, semester, type });
 }
 
 /**
  * Fetch a single curriculum by ID
  */
 export async function getCurriculum(curriculumId) {
-  const curriculumRef = doc(curriculumsCol, curriculumId);
-  const snap = await getDoc(curriculumRef);
-  
-  if (!snap.exists()) return null;
-  
-  return snap.data();
+  const result = await apiFetch(`/api/curriculums/${encodeURIComponent(curriculumId)}`);
+  return result;
 }
 
 /**
  * Fetch all curriculums
  */
 export async function listCurriculums() {
-  const snap = await getDocs(curriculumsCol);
-  return snap.docs.map((d) => d.data());
+  return await apiFetch("/api/curriculums");
 }
 
 /**
  * Delete a curriculum
  */
 export async function deleteCurriculum(curriculumId) {
-  await deleteDoc(doc(curriculumsCol, curriculumId));
-  await logAction("delete_curriculum", `Curriculum ${curriculumId} deleted`);
+  await apiFetch(`/api/curriculums/${encodeURIComponent(curriculumId)}`, { method: "DELETE" });
 }
 
 /**
